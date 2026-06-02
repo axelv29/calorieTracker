@@ -3,10 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Nutre — Rastreador de Calorías</title>
+<title>Nutre</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="favicon-256.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/fill/style.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/regular/style.css">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -66,9 +69,12 @@
           <div class="goal-panel-label">Objetivo</div>
           <div class="goal-panel-mode" id="setup-goal-mode">Completá tus datos para ver tu meta</div>
         </div>
-        <div class="goal-panel-kcal" id="setup-goal-kcal">—</div>
+        <div class="goal-panel-kcal-container">
+          <input type="number" id="setup-goal-kcal-input" class="goal-kcal-input" placeholder="—" oninput="onGoalKcalInput('setup')" onblur="restoreGoalKcal('setup')" />
+          <span class="goal-kcal-unit">kcal/día</span>
+        </div>
       </div>
-      <input type="range" id="setup-goal-offset" min="-600" max="600" step="50" value="0" oninput="updateSetupGoalPreview()" />
+      <input type="range" id="setup-goal-offset" min="-1000" max="1000" step="1" value="0" oninput="updateSetupGoalPreview()" />
       <div class="goal-scale">
         <span>Perder peso</span>
         <span>Mantener</span>
@@ -129,7 +135,7 @@
 
     <div class="sidebar-add-btn">
       <button onclick="openModal()">
-        <i class="ph-fill ph-plus" aria-hidden="true"></i> Agregar comida
+        <i class="ph ph-plus" aria-hidden="true"></i> Agregar comida
       </button>
     </div>
   </aside>
@@ -150,7 +156,7 @@
           <button class="icon-btn" onclick="goToDate(1)" title="Día siguiente"><i class="ph-fill ph-caret-right" aria-hidden="true"></i></button>
           <button class="icon-btn" onclick="goToToday()" title="Hoy" style="font-size:11px;font-weight:700;">hoy</button>
           <button class="mobile-add-btn" onclick="openModal()">
-            <i class="ph-fill ph-plus" aria-hidden="true"></i> Agregar
+            <i class="ph ph-plus" aria-hidden="true"></i> Agregar
           </button>
         </div>
       </div>
@@ -316,9 +322,12 @@
               <div class="goal-panel-label">Ajuste diario</div>
               <div class="goal-panel-mode" id="settings-goal-mode">—</div>
             </div>
-            <div class="goal-panel-kcal" id="settings-goal-kcal">—</div>
+            <div class="goal-panel-kcal-container">
+              <input type="number" id="settings-goal-kcal-input" class="goal-kcal-input" placeholder="—" oninput="onGoalKcalInput('settings')" onblur="restoreGoalKcal('settings')" />
+              <span class="goal-kcal-unit">kcal/día</span>
+            </div>
           </div>
-          <input type="range" id="settings-goal-offset" min="-600" max="600" step="50" value="0" oninput="updateSettingsGoalPreview()" />
+          <input type="range" id="settings-goal-offset" min="-1000" max="1000" step="1" value="0" oninput="updateSettingsGoalPreview()" />
           <div class="goal-scale">
             <span>Perder peso</span>
             <span>Mantener</span>
@@ -326,6 +335,24 @@
           </div>
           <div class="goal-panel-change" id="settings-goal-change">—</div>
           <div class="macro-recs" id="settings-macro-recs"></div>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h3>Tema de la aplicación</h3>
+        <div class="theme-selector">
+          <button class="theme-btn" data-theme="default" onclick="setTheme('default')">
+            <span class="theme-preview" style="background:#F4F7F3;border:1.5px solid #DDE7E1;"><span style="background:#0F8B8D;"></span></span>
+            Predeterminado
+          </button>
+          <button class="theme-btn" data-theme="avocado" onclick="setTheme('avocado')">
+            <span class="theme-preview" style="background:#F5F7F2;border:1.5px solid #E0E6D8;"><span style="background:#528038;"></span></span>
+            Aguacate
+          </button>
+          <button class="theme-btn" data-theme="dark" onclick="setTheme('dark')">
+            <span class="theme-preview" style="background:#0F172A;border:1.5px solid #334155;"><span style="background:#38BDF8;"></span></span>
+            Oscuro
+          </button>
         </div>
       </div>
 
@@ -368,14 +395,14 @@
 </nav>
 
 <!-- FAB (mobile) -->
-<button class="fab" id="fab" style="display:none;" onclick="openModal()"><i class="ph-fill ph-plus" aria-hidden="true"></i></button>
+<button class="fab" id="fab" style="display:none;" onclick="openModal()"><i class="ph ph-plus" aria-hidden="true"></i></button>
 
 <!-- ====== ADD FOOD MODAL ====== -->
 <div class="modal-overlay" id="modal-overlay" onclick="handleOverlayClick(event)">
   <div class="modal">
     <div class="modal-header">
       <h3 id="modal-title">Agregar comida</h3>
-      <button class="close-btn" onclick="closeModal()"><i class="ph-fill ph-x" aria-hidden="true"></i></button>
+      <button class="close-btn" onclick="closeModal()"><i class="ph ph-x" aria-hidden="true"></i></button>
     </div>
 
     <div class="tab-bar">
@@ -402,26 +429,24 @@
 
       <div class="photo-drop" id="photo-drop">
         <input type="file" id="photo-input" accept="image/*" capture="environment" onchange="handlePhotoSelect(event)" />
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="display:block;margin:0 auto 8px;color:var(--ink-3);"><rect x="2" y="6" width="20" height="14" rx="2" ry="2"/><circle cx="12" cy="13" r="4"/><path d="M17 6V4a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v2"/></svg>
+        <i class="ph ph-camera" aria-hidden="true" style="font-size: 32px; color: var(--ink-3); display: block; margin: 0 auto 8px;"></i>
         <p>Tocá para sacar foto o subir imagen</p>
         <small>JPG, PNG — se comprime automáticamente</small>
       </div>
 
-      <div class="weight-input-row">
-        <div class="form-row">
+      <div class="form-row-2" style="margin-top: 14px; align-items: flex-end;">
+        <div class="form-row" style="margin: 0;">
           <label>Peso de la porción (opcional)</label>
           <input type="number" id="photo-weight" placeholder="Ej: 250 g" step="1" min="1" />
         </div>
-        <button class="analyze-btn" id="analyze-btn" onclick="analyzePhoto()" disabled>
+        <button class="analyze-btn" id="analyze-btn" onclick="analyzePhoto()" disabled style="height: 41px;">
           Analizar →
         </button>
       </div>
 
-      <div class="photo-context-row">
-        <div class="form-row" style="margin:0;">
-          <label>Contexto extra para la IA (opcional)</label>
-          <textarea id="photo-context" placeholder="Ej: la milanesa es de pollo, hecha en air fryer, el puré no tiene crema..."></textarea>
-        </div>
+      <div class="form-row" style="margin-top: 14px;">
+        <label>Contexto extra para la IA (opcional)</label>
+        <textarea id="photo-context" placeholder="Ej: la milanesa es de pollo, hecha en air fryer, el puré no tiene crema..."></textarea>
       </div>
     </div>
 
@@ -473,8 +498,11 @@
         <input type="number" id="manual-fat" placeholder="0" />
       </div>
       <div class="save-food-toggle">
-        <input type="checkbox" id="save-manual" />
-        <label for="save-manual">Guardar en mis comidas para usar de nuevo</label>
+        <label class="switch">
+          <input type="checkbox" id="save-manual" />
+          <span class="slider-switch round"></span>
+        </label>
+        <label for="save-manual" class="toggle-label">Guardar en mis comidas para usar de nuevo</label>
       </div>
       <button class="btn-primary btn-green" id="manual-add-btn" style="margin-top:0;" onclick="addManualFood()">Agregar →</button>
     </div>
@@ -517,8 +545,11 @@
     </div>
 
     <div class="save-food-toggle" id="save-toggle" style="display:none;">
-      <input type="checkbox" id="save-to-library" />
-      <label for="save-to-library">Guardar en mis comidas para usar de nuevo</label>
+      <label class="switch">
+        <input type="checkbox" id="save-to-library" />
+        <span class="slider-switch round"></span>
+      </label>
+      <label for="save-to-library" class="toggle-label">Guardar en mis comidas para usar de nuevo</label>
     </div>
 
     <button class="btn-primary btn-green" id="add-food-btn" style="display:none;margin-top:0;" onclick="addFoodFromAi()">

@@ -183,19 +183,32 @@ Respondé SOLO con un JSON válido, sin markdown ni texto extra, con este format
 }`;
 }
 
+function getMinCalories(profile) {
+  const weight = Number(profile?.weight) || 0;
+  if (weight <= 0) return 1200;
+  const minProtein = Math.round(weight * 2.0);
+  const minFat = Math.round(weight * 0.8);
+  return Math.max(1200, minProtein * 4 + minFat * 9);
+}
+
 function getGoalOffset(profile) {
+  const minKcal = getMinCalories(profile);
+  const base = typeof profile?.tdee === 'number' ? profile.tdee : 0;
+  const minOffset = base > 0 ? Math.round(minKcal - base) : -1000;
+
   if (profile && typeof profile.goalOffset === 'number' && !Number.isNaN(profile.goalOffset)) {
-    return clamp(profile.goalOffset, -600, 600);
+    return clamp(profile.goalOffset, minOffset, 1000);
   }
   if (profile && typeof profile.goal === 'number' && typeof profile.tdee === 'number') {
-    return clamp(profile.goal - profile.tdee, -600, 600);
+    return clamp(profile.goal - profile.tdee, minOffset, 1000);
   }
   return 0;
 }
 
 function getGoalCalories(profile, offset) {
-  const base = typeof profile.tdee === 'number' ? profile.tdee : 0;
-  return Math.max(1200, Math.round(base + (typeof offset === 'number' ? offset : getGoalOffset(profile))));
+  const base = typeof profile?.tdee === 'number' ? profile.tdee : 0;
+  const minKcal = getMinCalories(profile);
+  return Math.max(minKcal, Math.round(base + (typeof offset === 'number' ? offset : getGoalOffset(profile))));
 }
 
 function normalizeProfileGoals(profile) {
@@ -279,18 +292,38 @@ function updateGoalPreview(prefix, profileLike, offsetOverride) {
 
   const weightReady = !!(base && base.weight && base.height && base.age && base.sex && base.activity);
   const tdee = weightReady ? calcTDEE(base) : (base.tdee || 0);
+  const minKcal = getMinCalories(base);
+  const minOffset = weightReady ? Math.max(-1000, Math.round(minKcal - tdee)) : -1000;
+
+  // Dynamically update slider min value to prevent phantom range
+  const slider = document.getElementById(`${prefix}-goal-offset`);
+  if (slider) {
+    slider.min = minOffset;
+  }
+
   const offsetInput = offsetOverride !== undefined
     ? offsetOverride
     : parseInt(document.getElementById(`${prefix}-goal-offset`).value || '0', 10);
-  const offset = clamp(Number.isNaN(offsetInput) ? 0 : offsetInput, -600, 600);
+  const offset = clamp(Number.isNaN(offsetInput) ? 0 : offsetInput, minOffset, 1000);
   const plan = getGoalPlan({ ...base, tdee }, offset);
 
   const modeEl = document.getElementById(`${prefix}-goal-mode`);
-  const kcalEl = document.getElementById(`${prefix}-goal-kcal`);
+  const kcalInput = document.getElementById(`${prefix}-goal-kcal-input`);
   const changeEl = document.getElementById(`${prefix}-goal-change`);
 
   if (modeEl) modeEl.textContent = weightReady ? plan.mode : 'Completá tus datos para ver tu meta';
-  if (kcalEl) kcalEl.textContent = weightReady ? `${plan.calories} kcal/día` : '—';
+  if (kcalInput) {
+    if (weightReady) {
+      kcalInput.disabled = false;
+      kcalInput.min = minKcal;
+      if (document.activeElement !== kcalInput) {
+        kcalInput.value = plan.calories;
+      }
+    } else {
+      kcalInput.value = '';
+      kcalInput.disabled = true;
+    }
+  }
   if (changeEl) changeEl.textContent = weightReady ? `${plan.offset > 0 ? '+' : ''}${plan.offset} kcal/día · ${plan.weeklyLabel}` : 'Ajuste de 0 kcal/día';
   renderMacroRecs(`${prefix}-macro-recs`, plan, weightReady);
 }
@@ -303,7 +336,9 @@ function syncGoalFromSlider(prefix) {
 
   if (!currentProfile) return;
   const slider = document.getElementById('settings-goal-offset');
-  const offset = clamp(parseInt(slider.value || '0', 10) || 0, -600, 600);
+  const minKcal = getMinCalories(currentProfile);
+  const minOffset = Math.round(minKcal - currentProfile.tdee);
+  const offset = clamp(parseInt(slider.value || '0', 10) || 0, minOffset, 1000);
   currentProfile.goalOffset = offset;
   currentProfile.goal = getGoalCalories(currentProfile, offset);
 
@@ -323,6 +358,51 @@ function updateSettingsGoalPreview() {
   syncGoalFromSlider('settings');
 }
 
+function onGoalKcalInput(prefix) {
+  const isSetup = prefix === 'setup';
+  const base = isSetup ? {
+    weight: parseFloat(document.getElementById('setup-weight').value),
+    height: parseFloat(document.getElementById('setup-height').value),
+    age: parseInt(document.getElementById('setup-age').value),
+    sex: document.getElementById('setup-sex').value,
+    activity: document.getElementById('setup-activity').value,
+  } : currentProfile;
+
+  const weightReady = !!(base && base.weight && base.height && base.age && base.sex && base.activity);
+  if (!weightReady) return;
+
+  const tdee = calcTDEE(base);
+  const minKcal = getMinCalories(base);
+  const kcalInput = document.getElementById(`${prefix}-goal-kcal-input`);
+  const kcal = parseInt(kcalInput.value, 10);
+  if (Number.isNaN(kcal) || kcal < 500) return;
+
+  const minOffset = Math.round(minKcal - tdee);
+  const offset = clamp(kcal - tdee, minOffset, 1000);
+  const slider = document.getElementById(`${prefix}-goal-offset`);
+  if (slider) slider.value = offset;
+
+  if (isSetup) {
+    updateGoalPreview('setup', null, offset);
+  } else {
+    if (!currentProfile) return;
+    currentProfile.goalOffset = offset;
+    currentProfile.goal = getGoalCalories(currentProfile, offset);
+
+    const profiles = getProfiles();
+    profiles[currentProfile.id] = currentProfile;
+    saveProfiles(profiles);
+
+    updateGoalPreview('settings', currentProfile, offset);
+    renderSidebar();
+    renderHome();
+  }
+}
+
+function restoreGoalKcal(prefix) {
+  updateGoalPreview(prefix);
+}
+
 function saveProfile() {
   const name = document.getElementById('setup-name').value.trim();
   const age = parseInt(document.getElementById('setup-age').value);
@@ -330,7 +410,6 @@ function saveProfile() {
   const weight = parseFloat(document.getElementById('setup-weight').value);
   const height = parseFloat(document.getElementById('setup-height').value);
   const activity = document.getElementById('setup-activity').value;
-  const goalOffset = clamp(parseInt(document.getElementById('setup-goal-offset').value || '0', 10) || 0, -600, 600);
   const apiKey = document.getElementById('setup-apikey').value.trim();
 
   if (!name || !age || !weight || !height) {
@@ -338,14 +417,20 @@ function saveProfile() {
     return;
   }
 
+  const tdee = calcTDEE({ weight, height, age, sex, activity });
+  const minKcal = getMinCalories({ weight });
+  const customKcal = parseInt(document.getElementById('setup-goal-kcal-input').value, 10);
+  const minOffset = Math.round(minKcal - tdee);
+  const goalOffset = !Number.isNaN(customKcal)
+    ? clamp(customKcal - tdee, minOffset, 1000)
+    : clamp(parseInt(document.getElementById('setup-goal-offset').value || '0', 10) || 0, minOffset, 1000);
+  const goal = getGoalCalories({ tdee, weight }, goalOffset);
+
   const profiles = getProfiles();
   const existingId = getActiveProfileId();
   const id = (existingId && profiles[existingId] && profiles[existingId].name === name)
     ? existingId
     : 'profile_' + Date.now();
-
-  const tdee = calcTDEE({ weight, height, age, sex, activity });
-  const goal = getGoalCalories({ tdee }, goalOffset);
 
   profiles[id] = {
     id, name, age, sex, weight, height, activity,
@@ -398,7 +483,7 @@ function renderProfileSwitcher(profiles, activeId) {
   if (keys.length === 0) { container.innerHTML = ''; return; }
   container.innerHTML = keys.map(id =>
     `<button class="profile-chip ${id === activeId ? 'active' : ''}" onclick="selectSetupProfile('${id}')">${profiles[id].name}</button>`
-  ).join('') + `<button class="profile-chip add-profile" onclick="clearSetupForm()">+ Nuevo</button>`;
+  ).join('') + `<button class="profile-chip add-profile" onclick="clearSetupForm()"><i class="ph ph-plus" aria-hidden="true" style="font-size:10px;margin-right:4px;vertical-align:middle;"></i>Nuevo</button>`;
 }
 
 function selectSetupProfile(id) {
@@ -762,6 +847,12 @@ function renderSettings() {
   const slider = document.getElementById('settings-goal-offset');
   if (slider) slider.value = goalOffset;
   updateGoalPreview('settings', p, goalOffset);
+
+  // Sync theme active class in settings
+  const currentTheme = localStorage.getItem('nutre_theme') || 'default';
+  document.querySelectorAll('.theme-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.theme === currentTheme);
+  });
 
   renderSavedFoodsSettings();
 }
@@ -1200,16 +1291,39 @@ function showErrorModal(title, msg) {
   el.id = 'error-modal';
   el.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:999;display:flex;align-items:center;justify-content:center;padding:24px;';
   el.innerHTML = `
-    <div style="background:#fff;border-radius:20px;padding:28px;max-width:420px;width:100%;box-shadow:0 8px 40px rgba(0,0,0,0.2);">
+    <div style="background:var(--card);border:1.5px solid var(--border);border-radius:20px;padding:28px;max-width:420px;width:100%;box-shadow:0 8px 40px rgba(0,0,0,0.2);">
       <div style="font-family:'Inter';font-size:1.1rem;font-weight:800;margin-bottom:12px;color:var(--red);">${title}</div>
       <div style="font-size:12px;color:var(--ink);background:var(--bg);border-radius:10px;padding:12px;font-family:monospace;line-height:1.6;word-break:break-word;max-height:200px;overflow-y:auto;">${msg}</div>
-      <button onclick="document.getElementById('error-modal').remove()" style="margin-top:16px;width:100%;padding:10px;background:var(--ink);color:#fff;border:none;border-radius:10px;font-family:'Inter';font-size:13px;font-weight:700;cursor:pointer;">Entendido</button>
+      <button onclick="document.getElementById('error-modal').remove()" style="margin-top:16px;width:100%;padding:10px;background:var(--btn-ink-bg);color:var(--btn-ink-color);border:none;border-radius:10px;font-family:'Inter';font-size:13px;font-weight:700;cursor:pointer;">Entendido</button>
     </div>`;
   document.body.appendChild(el);
 }
 
+// ===== THEME SWITCHER =====
+function initTheme() {
+  const theme = localStorage.getItem('nutre_theme') || 'default';
+  setTheme(theme, false);
+}
+
+function setTheme(theme, save = true) {
+  if (theme === 'default') {
+    document.body.removeAttribute('data-theme');
+  } else {
+    document.body.setAttribute('data-theme', theme);
+  }
+
+  if (save) {
+    localStorage.setItem('nutre_theme', theme);
+  }
+
+  document.querySelectorAll('.theme-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.theme === theme);
+  });
+}
+
 // ===== INIT =====
 window.addEventListener('load', () => {
+  initTheme();
   const id = getActiveProfileId();
   const profiles = getProfiles();
   if (id && profiles[id]) loadApp();
