@@ -360,6 +360,10 @@
             <span class="theme-preview" style="background:#0F172A;border:1.5px solid #334155;"><span style="background:#38BDF8;"></span></span>
             Oscuro
           </button>
+          <button class="theme-btn" data-theme="obsidian" onclick="setTheme('obsidian')">
+            <span class="theme-preview" style="background:#121218;border:1.5px solid #2E2E3E;"><span style="background:#A78BFA;"></span></span>
+            Obsidiana
+          </button>
         </div>
       </div>
 
@@ -435,7 +439,7 @@
       <img id="photo-preview" class="photo-preview" alt="preview" />
 
       <div class="photo-drop" id="photo-drop">
-        <input type="file" id="photo-input" accept="image/*" capture="environment" onchange="handlePhotoSelect(event)" />
+        <input type="file" id="photo-input" accept="image/*" onchange="handlePhotoSelect(event)" />
         <i class="ph ph-camera" aria-hidden="true" style="font-size: 32px; color: var(--ink-3); display: block; margin: 0 auto 8px;"></i>
         <p>Tocá para sacar foto o subir imagen</p>
         <small>JPG, PNG — se comprime automáticamente</small>
