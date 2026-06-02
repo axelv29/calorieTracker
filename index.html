@@ -918,7 +918,7 @@
         <input type="password" id="setup-apikey" placeholder="AIza..." />
       </div>
       <p class="api-note">
-        Necesaria para analizar fotos de comidas con IA. Conseguila gratis en
+        Necesaria para analizar fotos con IA. Conseguila gratis en
         <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio →</a>
         Tu clave se guarda solo en este navegador.
       </p>
@@ -1693,7 +1693,7 @@ Respondé SOLO con un JSON válido, sin markdown ni texto extra, con este format
 
   try {
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1713,10 +1713,17 @@ Respondé SOLO con un JSON válido, sin markdown ni texto extra, con este format
     if (!res.ok) {
       const msg = data?.error?.message || 'Error desconocido';
       const status = res.status;
-      if (status === 400) showToast('API Key inválida o error en la imagen');
-      else if (status === 403) showToast('API Key sin permisos — revisá en AI Studio');
-      else if (status === 429) showToast('Límite de requests alcanzado, esperá un momento');
-      else showToast('Error ' + status + ': ' + msg.slice(0, 60));
+      // Show full error in console for debugging
+      console.error('Gemini API error:', status, JSON.stringify(data));
+      if (status === 400) {
+        showErrorModal('Error 400', msg);
+      } else if (status === 403) {
+        showErrorModal('Error 403 — Sin permisos', msg);
+      } else if (status === 429) {
+        showErrorModal('Error 429 — Cuota excedida', msg);
+      } else {
+        showErrorModal('Error ' + status, msg);
+      }
       return;
     }
 
@@ -1847,6 +1854,31 @@ function clearAllData() {
   saveProfiles(profiles);
   localStorage.removeItem('nutre_active_profile');
   location.reload();
+}
+
+// ===== ERROR MODAL =====
+function showErrorModal(title, msg) {
+  // Remove existing if any
+  const old = document.getElementById('error-modal');
+  if (old) old.remove();
+
+  const el = document.createElement('div');
+  el.id = 'error-modal';
+  el.style.cssText = `
+    position:fixed; inset:0; background:rgba(28,28,26,0.6); z-index:999;
+    display:flex; align-items:center; justify-content:center; padding:24px;
+  `;
+  el.innerHTML = `
+    <div style="background:var(--warm-white); border-radius:20px; padding:28px; max-width:420px; width:100%; box-shadow:0 8px 40px rgba(0,0,0,0.2);">
+      <div style="font-family:'Fraunces',serif; font-size:1.1rem; margin-bottom:12px; color:var(--terracotta);">${title}</div>
+      <div style="font-size:12px; color:var(--ink); background:var(--cream); border-radius:10px; padding:12px; font-family:monospace; line-height:1.6; word-break:break-word; max-height:200px; overflow-y:auto;">${msg}</div>
+      <button onclick="document.getElementById('error-modal').remove()" style="
+        margin-top:16px; width:100%; padding:10px; background:var(--ink); color:var(--cream);
+        border:none; border-radius:10px; font-family:'DM Sans',sans-serif; font-size:13px; cursor:pointer;
+      ">Entendido</button>
+    </div>
+  `;
+  document.body.appendChild(el);
 }
 
 // ===== INIT =====
