@@ -1055,6 +1055,7 @@ h1, h2, h3, .display {
   display: grid;
   gap: 16px;
   grid-template-columns: 1fr 1fr;
+  margin-bottom: 8px;
 }
 
 @media (min-width: 900px) {

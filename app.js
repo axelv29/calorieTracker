@@ -743,9 +743,195 @@ function goToToday() {
 }
 
 // ===== STATS =====
+function calculateStreak(profileId) {
+  const today = todayStr();
+  const tFoods = getStorage(getFoodsKey(profileId, today)) || [];
+  let startDate;
+
+  if (tFoods.length > 0) {
+    startDate = new Date(today + 'T12:00:00');
+  } else {
+    const y = new Date(); y.setDate(y.getDate() - 1);
+    const yds = y.toISOString().split('T')[0];
+    const yFoods = getStorage(getFoodsKey(profileId, yds)) || [];
+    if (yFoods.length === 0) return 0;
+    startDate = y;
+  }
+
+  let streak = 0;
+  for (let i = 0; i < 365; i++) {
+    const d = new Date(startDate); d.setDate(d.getDate() - i);
+    const ds = d.toISOString().split('T')[0];
+    const foods = getStorage(getFoodsKey(profileId, ds)) || [];
+    if (foods.length > 0) streak++;
+    else break;
+  }
+  return streak;
+}
+
+function calculateAdherence(profileId, goal) {
+  const today = new Date(todayStr() + 'T12:00:00');
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+  const daysInMonth = today.getDate();
+  let under = 0, onTrack = 0, over = 0, withData = 0;
+
+  for (let i = 0; i < daysInMonth; i++) {
+    const d = new Date(monthStart); d.setDate(d.getDate() + i);
+    const foods = getStorage(getFoodsKey(profileId, d.toISOString().split('T')[0])) || [];
+    const kcal = foods.reduce((s, f) => s + (f.kcal || 0), 0);
+    if (kcal === 0) continue;
+    withData++;
+    const ratio = kcal / goal;
+    if (ratio < 0.9) under++;
+    else if (ratio <= 1.1) onTrack++;
+    else over++;
+  }
+
+  return {
+    under, onTrack, over, withData,
+    underPct: withData ? (under / withData * 100) : 0,
+    onTrackPct: withData ? (onTrack / withData * 100) : 0,
+    overPct: withData ? (over / withData * 100) : 0
+  };
+}
+
+function getWeekAverage(profileId, date) {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  const monday = new Date(d); monday.setDate(diff);
+
+  let total = 0, days = 0;
+  for (let i = 0; i < 7; i++) {
+    const day = new Date(monday); day.setDate(monday.getDate() + i);
+    const foods = getStorage(getFoodsKey(profileId, day.toISOString().split('T')[0])) || [];
+    const kcal = foods.reduce((s, f) => s + (f.kcal || 0), 0);
+    if (kcal > 0) { total += kcal; days++; }
+  }
+  return days > 0 ? Math.round(total / days) : 0;
+}
+
+function averageMacros(profileId, daysBack) {
+  const today = new Date(todayStr() + 'T12:00:00');
+  let totalP = 0, totalC = 0, totalF = 0, days = 0;
+
+  for (let i = 0; i < daysBack; i++) {
+    const d = new Date(today); d.setDate(d.getDate() - i);
+    const foods = getStorage(getFoodsKey(profileId, d.toISOString().split('T')[0])) || [];
+    if (foods.length === 0) continue;
+    days++;
+    foods.forEach(f => {
+      totalP += f.protein || 0;
+      totalC += f.carbs || 0;
+      totalF += f.fat || 0;
+    });
+  }
+
+  if (days === 0) return { protein: 0, carbs: 0, fat: 0, kcal: 0, pctP: 0, pctC: 0, pctF: 0 };
+
+  const avgP = Math.round(totalP / days);
+  const avgC = Math.round(totalC / days);
+  const avgF = Math.round(totalF / days);
+  const kcalP = avgP * 4, kcalC = avgC * 4, kcalF = avgF * 9;
+  const total = kcalP + kcalC + kcalF;
+
+  return {
+    protein: avgP, carbs: avgC, fat: avgF, kcal: total,
+    pctP: total ? Math.round(kcalP / total * 100) : 0,
+    pctC: total ? Math.round(kcalC / total * 100) : 0,
+    pctF: total ? Math.round(kcalF / total * 100) : 0
+  };
+}
+
+let statsCalendarMonth = null;
+
+function renderCalendarHeatmap(profileId, goal, year, month) {
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  const daysInMonth = lastDay.getDate();
+  const startDow = firstDay.getDay(); // 0=Sun
+
+  const monthNames = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const dayLabels = ['D','L','M','X','J','V','S'];
+
+  let html = `<div class="calendar-header">
+    <button class="calendar-nav-btn" onclick="changeCalendarMonth(-1)">&#8249;</button>
+    <span class="calendar-month-label">${monthNames[month]} ${year}</span>
+    <button class="calendar-nav-btn" onclick="changeCalendarMonth(1)">&#8250;</button>
+  </div>
+  <div class="calendar-heatmap">`;
+
+  // Day of week headers
+  dayLabels.forEach(l => {
+    html += `<div class="heatmap-weekday-label">${l}</div>`;
+  });
+
+  // Empty cells before first day
+  for (let i = 0; i < startDow; i++) {
+    html += `<div></div>`;
+  }
+
+  // Day cells
+  for (let d = 1; d <= daysInMonth; d++) {
+    const date = new Date(year, month, d);
+    const ds = date.toISOString().split('T')[0];
+    const foods = getStorage(getFoodsKey(profileId, ds)) || [];
+    const kcal = foods.reduce((s, f) => s + (f.kcal || 0), 0);
+    const today = todayStr();
+
+    let level = 0;
+    let tooltip = `${d} — sin datos`;
+    if (kcal > 0) {
+      tooltip = `${d} — ${kcal} kcal`;
+      const ratio = kcal / goal;
+      if (ratio < 0.5) level = 1;
+      else if (ratio < 0.9) level = 2;
+      else if (ratio <= 1.1) level = 3;
+      else level = 4;
+    }
+
+    const isToday = ds === today;
+    html += `<div class="heatmap-cell${isToday ? '" style="outline:2px solid var(--primary-dark);outline-offset:-2px' : ''}" data-level="${level}" title="${tooltip.replace('—', '')}">
+      <span>${d}</span>
+      <span class="heatmap-tooltip">${tooltip}</span>
+    </div>`;
+  }
+
+  html += `</div>`;
+
+  // Legend
+  html += `<div class="heatmap-legend">
+    <span>Sin datos</span>
+    <div class="heatmap-legend-cell" data-level="0"></div>
+    <div class="heatmap-legend-cell" data-level="1"></div>
+    <div class="heatmap-legend-cell" data-level="2"></div>
+    <div class="heatmap-legend-cell" data-level="3"></div>
+    <div class="heatmap-legend-cell" data-level="4"></div>
+    <span>&gt;110%</span>
+  </div>`;
+
+  return html;
+}
+
+function changeCalendarMonth(dir) {
+  if (!statsCalendarMonth) {
+    const today = new Date();
+    statsCalendarMonth = { year: today.getFullYear(), month: today.getMonth() };
+  }
+  statsCalendarMonth.month += dir;
+  if (statsCalendarMonth.month < 0) { statsCalendarMonth.month = 11; statsCalendarMonth.year--; }
+  if (statsCalendarMonth.month > 11) { statsCalendarMonth.month = 0; statsCalendarMonth.year++; }
+  const el = document.getElementById('calendar-heatmap');
+  if (el) {
+    el.innerHTML = renderCalendarHeatmap(currentProfile.id, currentProfile.goal, statsCalendarMonth.year, statsCalendarMonth.month);
+  }
+}
+
 function renderStats() {
   const today = new Date(todayStr() + 'T12:00:00');
   const dayLabels = ['D','L','M','X','J','V','S'];
+  const goal = currentProfile.goal;
+  const pid = currentProfile.id;
 
   // Big week chart
   const barsEl = document.getElementById('big-week-bars');
@@ -755,7 +941,7 @@ function renderStats() {
   for (let i = 6; i >= 0; i--) {
     const d = new Date(today); d.setDate(d.getDate() - i);
     const ds = d.toISOString().split('T')[0];
-    const foods = getStorage(getFoodsKey(currentProfile.id, ds)) || [];
+    const foods = getStorage(getFoodsKey(pid, ds)) || [];
     const kcal = foods.reduce((s, f) => s + (f.kcal || 0), 0);
     if (kcal > 0) { weekTotal += kcal; weekDays++; }
     if (kcal > maxKcal) maxKcal = kcal;
@@ -763,7 +949,6 @@ function renderStats() {
   }
 
   if (barsEl) {
-    const goal = currentProfile.goal;
     barsEl.innerHTML = weekData.map(({ kcal, label, isToday }) => {
       const pct = kcal > 0 ? Math.max(8, (kcal / Math.max(maxKcal, goal)) * 108) : 4;
       let cls = kcal === 0 ? 'empty' : isToday ? 'today' : kcal > goal ? 'over' : 'under';
@@ -783,42 +968,148 @@ function renderStats() {
   for (let i = 0; i < daysInMonth; i++) {
     const d = new Date(monthStart); d.setDate(d.getDate() + i);
     const ds = d.toISOString().split('T')[0];
-    const foods = getStorage(getFoodsKey(currentProfile.id, ds)) || [];
+    const foods = getStorage(getFoodsKey(pid, ds)) || [];
     const kcal = foods.reduce((s, f) => s + (f.kcal || 0), 0);
-    if (kcal > 0) { monthTotal += kcal; monthDays++; }
-    totalDeficit += currentProfile.goal - kcal;
+    if (kcal === 0) continue;
+    monthTotal += kcal;
+    monthDays++;
+    totalDeficit += goal - kcal;
   }
 
   const weekAvg = weekDays > 0 ? Math.round(weekTotal / weekDays) : 0;
   const monthAvg = monthDays > 0 ? Math.round(monthTotal / monthDays) : 0;
   const gramsFat = Math.round(Math.abs(totalDeficit) / 7700 * 1000);
+  const defSign = totalDeficit >= 0;
 
+  // New stats
+  const streak = calculateStreak(pid);
+  const adherence = calculateAdherence(pid, goal);
+  const thisWeekAvg = getWeekAverage(pid, today);
+  const lastWeekDate = new Date(today); lastWeekDate.setDate(today.getDate() - 7);
+  const lastWeekAvg = getWeekAverage(pid, lastWeekDate);
+  const macros = averageMacros(pid, 7);
+
+  const weekDiff = thisWeekAvg - lastWeekAvg;
+  let weekDiffStr, weekDiffCls;
+  if (lastWeekAvg === 0) {
+    weekDiffStr = 'vs semana pasada';
+    weekDiffCls = 'same';
+  } else {
+    const pct = Math.round(Math.abs(weekDiff) / lastWeekAvg * 100);
+    weekDiffStr = `${weekDiff > 0 ? '+' : ''}${weekDiff} kcal (${pct}%)`;
+    weekDiffCls = weekDiff > 0 ? 'up' : weekDiff < 0 ? 'down' : 'same';
+  }
+
+  // Render stats grid
   const grid = document.getElementById('stats-grid');
   if (!grid) return;
 
-  const defSign = totalDeficit >= 0;
   grid.innerHTML = `
     <div class="stat-card">
       <div class="sc-label">Promedio semanal</div>
-      <div class="sc-value ${weekAvg > currentProfile.goal ? 'color-orange' : 'color-green'}">${weekAvg || '—'}</div>
+      <div class="sc-value ${weekAvg > goal ? 'color-orange' : 'color-green'}">${weekAvg || '—'}</div>
       <div class="sc-sub">kcal / día</div>
     </div>
     <div class="stat-card">
       <div class="sc-label">Promedio mensual</div>
-      <div class="sc-value ${monthAvg > currentProfile.goal ? 'color-orange' : 'color-green'}">${monthAvg || '—'}</div>
+      <div class="sc-value ${monthAvg > goal ? 'color-orange' : 'color-green'}">${monthAvg || '—'}</div>
       <div class="sc-sub">kcal / día</div>
     </div>
     <div class="stat-card">
+      <div class="sc-label">Racha actual</div>
+      <div class="sc-value color-green">${streak}</div>
+      <div class="sc-sub">días consecutivos registrando</div>
+    </div>
+    <div class="stat-card">
+      <div class="sc-label">Adherencia a la meta</div>
+      <div class="sc-value ${adherence.withData ? 'color-green' : ''}">${adherence.withData ? Math.round(adherence.onTrackPct) : '—'}<span class="sc-sub" style="font-size:1rem;font-weight:400;">%</span></div>
+      <div class="sc-sub">días dentro del 90-110%</div>
+      ${adherence.withData ? `<div class="adherence-bar-wrap">
+        <div class="adherence-segment under" style="width:${adherence.underPct}%"></div>
+        <div class="adherence-segment on-track" style="width:${adherence.onTrackPct}%"></div>
+        <div class="adherence-segment over" style="width:${adherence.overPct}%"></div>
+      </div>
+      <div class="adherence-legend">
+        <span class="adherence-legend-item"><span class="adherence-legend-dot under"></span>Bajo ${adherence.under}</span>
+        <span class="adherence-legend-item"><span class="adherence-legend-dot on-track"></span>Meta ${adherence.onTrack}</span>
+        <span class="adherence-legend-item"><span class="adherence-legend-dot over"></span>Exceso ${adherence.over}</span>
+      </div>` : '<div style="font-size:11px;color:var(--ink-3);margin-top:6px;">Registrá comidas para ver adherencia</div>'}
+    </div>
+    <div class="stat-card sc-span2">
       <div class="sc-label">Balance del mes</div>
       <div class="sc-value ${defSign ? 'color-green' : 'color-orange'}">${defSign ? '+' : ''}${totalDeficit}</div>
       <div class="sc-sub">kcal de ${defSign ? 'déficit' : 'superávit'}</div>
     </div>
-    <div class="stat-card">
+    <div class="stat-card sc-span2">
       <div class="sc-label">Grasa ${defSign ? 'perdida' : 'ganada'}</div>
       <div class="sc-value ${defSign ? 'color-green' : 'color-orange'}">${gramsFat}</div>
       <div class="sc-sub">gramos estimados (≈7.700 kcal/kg)</div>
     </div>
+    <div class="stat-card">
+      <div class="sc-label">Comparación semanal</div>
+      <div class="week-comp-value ${thisWeekAvg > goal ? 'color-orange' : 'color-green'}">${thisWeekAvg || '—'}</div>
+      <div class="week-comp-change ${weekDiffCls}">${weekDiffStr}</div>
+    </div>
+    <div class="stat-card">
+      <div class="sc-label">Macros promedio</div>
+      <div class="sc-value" style="font-size:1.2rem;display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">${macros.protein || '—'}<span class="sc-sub" style="font-size:0.7rem;">p</span><span style="color:var(--border);font-weight:300;">|</span> ${macros.carbs || '—'}<span class="sc-sub" style="font-size:0.7rem;">c</span><span style="color:var(--border);font-weight:300;">|</span> ${macros.fat || '—'}<span class="sc-sub" style="font-size:0.7rem;">g</span></div>
+      <div class="sc-sub">proteína · carbos · grasas (g)</div>
+    </div>
   `;
+
+  // Macro breakdown section
+  const macroSection = document.getElementById('macro-breakdown');
+  if (macroSection && macros.kcal > 0) {
+    const maxGrams = Math.max(macros.protein, macros.carbs, macros.fat, 1);
+    macroSection.innerHTML = `
+      <div class="stats-section">
+        <div class="card-title">Distribución de macronutrientes</div>
+        <div class="macro-breakdown-item">
+          <div class="macro-bd-header">
+            <span class="macro-bd-label">Proteínas</span>
+            <span class="macro-bd-values">${macros.protein}g · ${macros.pctP}%</span>
+          </div>
+          <div class="macro-bd-bar-bg">
+            <div class="macro-bd-bar-fill protein" style="width:${macros.protein / maxGrams * 100}%"></div>
+          </div>
+        </div>
+        <div class="macro-breakdown-item">
+          <div class="macro-bd-header">
+            <span class="macro-bd-label">Carbohidratos</span>
+            <span class="macro-bd-values">${macros.carbs}g · ${macros.pctC}%</span>
+          </div>
+          <div class="macro-bd-bar-bg">
+            <div class="macro-bd-bar-fill carbs" style="width:${macros.carbs / maxGrams * 100}%"></div>
+          </div>
+        </div>
+        <div class="macro-breakdown-item">
+          <div class="macro-bd-header">
+            <span class="macro-bd-label">Grasas</span>
+            <span class="macro-bd-values">${macros.fat}g · ${macros.pctF}%</span>
+          </div>
+          <div class="macro-bd-bar-bg">
+            <div class="macro-bd-bar-fill fat" style="width:${macros.fat / maxGrams * 100}%"></div>
+          </div>
+        </div>
+        <div class="macro-bd-summary">
+          <span class="macro-bd-summary-item"><span class="macro-bd-summary-dot protein"></span>${macros.protein}g proteína</span>
+          <span class="macro-bd-summary-item"><span class="macro-bd-summary-dot carbs"></span>${macros.carbs}g carbohidratos</span>
+          <span class="macro-bd-summary-item"><span class="macro-bd-summary-dot fat"></span>${macros.fat}g grasas</span>
+        </div>
+      </div>
+    `;
+  } else if (macroSection) {
+    macroSection.innerHTML = '';
+  }
+
+  // Calendar heatmap
+  const calEl = document.getElementById('calendar-heatmap');
+  if (calEl) {
+    if (!statsCalendarMonth) {
+      statsCalendarMonth = { year: today.getFullYear(), month: today.getMonth() };
+    }
+    calEl.innerHTML = renderCalendarHeatmap(pid, goal, statsCalendarMonth.year, statsCalendarMonth.month);
+  }
 }
 
 // ===== SETTINGS =====
