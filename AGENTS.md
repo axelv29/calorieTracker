@@ -7,7 +7,7 @@ Idioma: **español**.
 ## Stack
 
 - HTML + CSS plano + JS vanilla (sin dependencias)
-- Fuentes: Syne + Plus Jakarta Sans via Google Fonts (ya cargadas)
+- Fuentes: Inter + Plus Jakarta Sans via Google Fonts (ya cargadas)
 - IA: **Google Gemini API** (`gemini-2.5-flash-lite`) para análisis de fotos de comida
 - Sin tests, sin linter, sin typechecker, sin CI
 

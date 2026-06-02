@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Nutre — Rastreador de Calorías</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/fill/style.css">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -14,25 +15,25 @@
 <div id="setup-screen" style="display:flex;">
   <div class="setup-card">
     <div class="setup-logo">
-      <span class="logo-dot"></span> nutre
+      <i class="ph-fill ph-bowl-food brand-mark" aria-hidden="true"></i> nutre
     </div>
-    <h1>Hola,<br><em>bienvenido/a</em> 👋</h1>
+    <h1>Hola,<br><em>bienvenido/a</em></h1>
     <p class="subtitle">Configurá tu perfil para empezar a rastrear tus calorías con IA.</p>
 
     <div id="profiles-switcher" class="profiles-switcher"></div>
 
     <div class="form-row">
       <label>Tu nombre</label>
-      <input type="text" id="setup-name" placeholder="Ej: Axel" />
+      <input type="text" id="setup-name" placeholder="Ej: Axel" oninput="updateSetupGoalPreview()" />
     </div>
     <div class="form-row-2">
       <div class="form-row">
         <label>Edad</label>
-        <input type="number" id="setup-age" placeholder="25" min="10" max="100" />
+        <input type="number" id="setup-age" placeholder="25" min="10" max="100" oninput="updateSetupGoalPreview()" />
       </div>
       <div class="form-row">
         <label>Sexo</label>
-        <select id="setup-sex">
+        <select id="setup-sex" onchange="updateSetupGoalPreview()">
           <option value="m">Masculino</option>
           <option value="f">Femenino</option>
         </select>
@@ -41,16 +42,16 @@
     <div class="form-row-2">
       <div class="form-row">
         <label>Peso (kg)</label>
-        <input type="number" id="setup-weight" placeholder="70" step="0.1" />
+        <input type="number" id="setup-weight" placeholder="70" step="0.1" oninput="updateSetupGoalPreview()" />
       </div>
       <div class="form-row">
         <label>Altura (cm)</label>
-        <input type="number" id="setup-height" placeholder="175" />
+        <input type="number" id="setup-height" placeholder="175" oninput="updateSetupGoalPreview()" />
       </div>
     </div>
     <div class="form-row">
       <label>Nivel de actividad</label>
-      <select id="setup-activity">
+      <select id="setup-activity" onchange="updateSetupGoalPreview()">
         <option value="1.2">Sedentario (poco o nada de ejercicio)</option>
         <option value="1.375">Ligero (1-3 días/semana)</option>
         <option value="1.55" selected>Moderado (3-5 días/semana)</option>
@@ -58,13 +59,27 @@
         <option value="1.9">Muy activo (ejercicio intenso diario)</option>
       </select>
     </div>
-    <div class="form-row">
-      <label>Objetivo calórico diario (kcal)</label>
-      <input type="number" id="setup-goal" placeholder="Se calculará automáticamente" />
+
+    <div class="goal-panel">
+      <div class="goal-panel-head">
+        <div>
+          <div class="goal-panel-label">Objetivo</div>
+          <div class="goal-panel-mode" id="setup-goal-mode">Completá tus datos para ver tu meta</div>
+        </div>
+        <div class="goal-panel-kcal" id="setup-goal-kcal">—</div>
+      </div>
+      <input type="range" id="setup-goal-offset" min="-600" max="600" step="50" value="0" oninput="updateSetupGoalPreview()" />
+      <div class="goal-scale">
+        <span>Perder peso</span>
+        <span>Mantener</span>
+        <span>Ganar peso</span>
+      </div>
+      <div class="goal-panel-change" id="setup-goal-change">Ajuste de 0 kcal/día</div>
+      <div class="macro-recs" id="setup-macro-recs"></div>
+      <p class="goal-panel-note">
+        Mové la barra para definir un pequeño déficit o superávit y ver cuánto podrías perder o ganar por semana.
+      </p>
     </div>
-    <small style="font-size:11px;color:var(--ink-3);display:block;margin-top:-8px;margin-bottom:14px;line-height:1.5;">
-      Dejá vacío para usar tu TDEE calculado, o ingresá un valor personalizado.
-    </small>
 
     <div class="api-section">
       <div class="form-row">
@@ -88,12 +103,12 @@
   <!-- SIDEBAR (desktop only) -->
   <aside class="app-sidebar">
     <div class="sidebar-logo">
-      <div class="logo-badge">🥗</div>
+      <div class="logo-badge"><i class="ph-fill ph-bowl-food brand-mark" aria-hidden="true"></i></div>
       nutre
     </div>
 
     <div class="sidebar-profile" onclick="switchProfile()">
-      <div class="sidebar-avatar" id="sidebar-avatar">👤</div>
+      <div class="sidebar-avatar" id="sidebar-avatar"></div>
       <div>
         <div class="sidebar-profile-name" id="sidebar-profile-name">—</div>
         <div class="sidebar-profile-sub" id="sidebar-profile-sub">—</div>
@@ -103,18 +118,18 @@
     <div class="sidebar-label">Menú</div>
 
     <button class="nav-link active" data-page="home" onclick="showPage('home')">
-      <span class="nav-icon">🏠</span> Inicio
+      <i class="ph-fill ph-house nav-icon" aria-hidden="true"></i> Inicio
     </button>
     <button class="nav-link" data-page="stats" onclick="showPage('stats')">
-      <span class="nav-icon">📊</span> Estadísticas
+      <i class="ph-fill ph-chart-line-up nav-icon" aria-hidden="true"></i> Estadísticas
     </button>
     <button class="nav-link" data-page="settings" onclick="showPage('settings')">
-      <span class="nav-icon">⚙️</span> Ajustes
+      <i class="ph-fill ph-gear-six nav-icon" aria-hidden="true"></i> Ajustes
     </button>
 
     <div class="sidebar-add-btn">
       <button onclick="openModal()">
-        <span style="font-size:18px;">+</span> Agregar comida
+        <i class="ph-fill ph-plus" aria-hidden="true"></i> Agregar comida
       </button>
     </div>
   </aside>
@@ -127,15 +142,15 @@
 
       <div class="page-header">
         <div class="page-header-left">
-          <h2 id="header-day">Hoy ✨</h2>
+          <h2 id="header-day">Hoy</h2>
           <div class="date-label" id="header-date"></div>
         </div>
         <div class="header-actions">
-          <button class="icon-btn" onclick="goToDate(-1)" title="Día anterior">←</button>
-          <button class="icon-btn" onclick="goToDate(1)" title="Día siguiente">→</button>
+          <button class="icon-btn" onclick="goToDate(-1)" title="Día anterior"><i class="ph-fill ph-caret-left" aria-hidden="true"></i></button>
+          <button class="icon-btn" onclick="goToDate(1)" title="Día siguiente"><i class="ph-fill ph-caret-right" aria-hidden="true"></i></button>
           <button class="icon-btn" onclick="goToToday()" title="Hoy" style="font-size:11px;font-weight:700;">hoy</button>
           <button class="mobile-add-btn" onclick="openModal()">
-            <span>+</span> Agregar
+            <i class="ph-fill ph-plus" aria-hidden="true"></i> Agregar
           </button>
         </div>
       </div>
@@ -143,7 +158,7 @@
       <!-- Summary banner -->
       <div class="summary-banner" id="summary-banner">
         <div class="banner-text">
-          <div class="banner-title">¡Empezá a registrar! 🍽️</div>
+          <div class="banner-title">¡Empezá a registrar!</div>
           <div class="banner-sub">Agregá tu primera comida del día</div>
         </div>
         <div class="banner-stat">
@@ -163,7 +178,7 @@
               <svg width="110" height="110" viewBox="0 0 110 110">
                 <circle cx="55" cy="55" r="40" fill="none" stroke="var(--border)" stroke-width="10"/>
                 <circle id="ring-progress" cx="55" cy="55" r="40" fill="none"
-                  stroke="var(--green)" stroke-width="10"
+                  stroke="var(--primary)" stroke-width="10"
                   stroke-linecap="round"
                   stroke-dasharray="251.2"
                   stroke-dashoffset="251.2"
@@ -260,7 +275,7 @@
     <div id="page-stats" class="page">
       <div class="page-header">
         <div class="page-header-left">
-          <h2>Estadísticas 📈</h2>
+          <h2>Estadísticas</h2>
           <div class="date-label">Tu progreso en el tiempo</div>
         </div>
       </div>
@@ -277,14 +292,14 @@
     <div id="page-settings" class="page">
       <div class="page-header">
         <div class="page-header-left">
-          <h2>Ajustes ⚙️</h2>
+          <h2>Ajustes</h2>
         </div>
       </div>
 
       <div class="settings-section">
         <h3>Mi perfil</h3>
         <div class="profile-display">
-          <div class="avatar" id="settings-avatar">👤</div>
+          <div class="avatar" id="settings-avatar"></div>
           <div>
             <div class="profile-name" id="settings-name">—</div>
             <div class="profile-tdee" id="settings-tdee">—</div>
@@ -294,10 +309,31 @@
       </div>
 
       <div class="settings-section">
-        <h3>Mis comidas guardadas 📚</h3>
+        <h3>Objetivo y macros</h3>
+        <div class="goal-panel goal-panel-compact">
+          <div class="goal-panel-head">
+            <div>
+              <div class="goal-panel-label">Ajuste diario</div>
+              <div class="goal-panel-mode" id="settings-goal-mode">—</div>
+            </div>
+            <div class="goal-panel-kcal" id="settings-goal-kcal">—</div>
+          </div>
+          <input type="range" id="settings-goal-offset" min="-600" max="600" step="50" value="0" oninput="updateSettingsGoalPreview()" />
+          <div class="goal-scale">
+            <span>Perder peso</span>
+            <span>Mantener</span>
+            <span>Ganar peso</span>
+          </div>
+          <div class="goal-panel-change" id="settings-goal-change">—</div>
+          <div class="macro-recs" id="settings-macro-recs"></div>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h3>Mis comidas guardadas</h3>
         <div id="saved-foods-list-settings"></div>
         <p id="no-saved-msg" style="font-size:12px;color:var(--ink-3);text-align:center;padding:12px 0;">
-          Guardá comidas frecuentes al agregarlas ✨
+          Guardá comidas frecuentes al agregarlas
         </p>
       </div>
 
@@ -317,35 +353,47 @@
 
 <!-- BOTTOM NAV (mobile) -->
 <nav class="bottom-nav" id="bottom-nav" style="display:none;">
-  <button class="nav-item active" data-page="home" onclick="showPage('home')">
-    <span class="nav-icon">🏠</span>
-    Inicio
-  </button>
-  <button class="nav-item" data-page="stats" onclick="showPage('stats')">
-    <span class="nav-icon">📊</span>
-    Stats
-  </button>
-  <button class="nav-item" data-page="settings" onclick="showPage('settings')">
-    <span class="nav-icon">⚙️</span>
-    Ajustes
-  </button>
+    <button class="nav-item active" data-page="home" onclick="showPage('home')">
+      <i class="ph-fill ph-house nav-icon" aria-hidden="true"></i>
+      Inicio
+    </button>
+    <button class="nav-item" data-page="stats" onclick="showPage('stats')">
+      <i class="ph-fill ph-chart-line-up nav-icon" aria-hidden="true"></i>
+      Stats
+    </button>
+    <button class="nav-item" data-page="settings" onclick="showPage('settings')">
+      <i class="ph-fill ph-gear-six nav-icon" aria-hidden="true"></i>
+      Ajustes
+    </button>
 </nav>
 
 <!-- FAB (mobile) -->
-<button class="fab" id="fab" style="display:none;" onclick="openModal()">+</button>
+<button class="fab" id="fab" style="display:none;" onclick="openModal()"><i class="ph-fill ph-plus" aria-hidden="true"></i></button>
 
 <!-- ====== ADD FOOD MODAL ====== -->
 <div class="modal-overlay" id="modal-overlay" onclick="handleOverlayClick(event)">
   <div class="modal">
     <div class="modal-header">
-      <h3>Agregar comida</h3>
-      <button class="close-btn" onclick="closeModal()">✕</button>
+      <h3 id="modal-title">Agregar comida</h3>
+      <button class="close-btn" onclick="closeModal()"><i class="ph-fill ph-x" aria-hidden="true"></i></button>
     </div>
 
     <div class="tab-bar">
-      <button class="tab-btn active" onclick="switchTab('photo')">📷 Foto IA</button>
-      <button class="tab-btn" onclick="switchTab('manual')">✏️ Manual</button>
-      <button class="tab-btn" onclick="switchTab('saved')">📚 Guardadas</button>
+      <button class="tab-btn active" data-tab="photo" onclick="switchTab('photo')"><i class="ph-fill ph-camera tab-icon" aria-hidden="true"></i>Foto IA</button>
+      <button class="tab-btn" data-tab="text" onclick="switchTab('text')"><i class="ph-fill ph-pencil-simple tab-icon" aria-hidden="true"></i>Texto IA</button>
+      <button class="tab-btn" data-tab="manual" onclick="switchTab('manual')"><i class="ph-fill ph-note-pencil tab-icon" aria-hidden="true"></i>Manual</button>
+      <button class="tab-btn" data-tab="saved" onclick="switchTab('saved')"><i class="ph-fill ph-bookmarks tab-icon" aria-hidden="true"></i>Guardadas</button>
+    </div>
+
+    <div class="meal-type-selector meal-type-selector-shared">
+      <label>Tipo de comida</label>
+      <div class="meal-pills">
+        <button class="meal-pill active" data-meal="breakfast" onclick="selectMealType('breakfast')">Desayuno</button>
+        <button class="meal-pill" data-meal="lunch" onclick="selectMealType('lunch')">Almuerzo</button>
+        <button class="meal-pill" data-meal="snack" onclick="selectMealType('snack')">Merienda</button>
+        <button class="meal-pill" data-meal="dinner" onclick="selectMealType('dinner')">Cena</button>
+        <button class="meal-pill" data-meal="other" onclick="selectMealType('other')">Otros</button>
+      </div>
     </div>
 
     <!-- PHOTO TAB -->
@@ -354,7 +402,7 @@
 
       <div class="photo-drop" id="photo-drop">
         <input type="file" id="photo-input" accept="image/*" capture="environment" onchange="handlePhotoSelect(event)" />
-        <div class="upload-icon">📸</div>
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="display:block;margin:0 auto 8px;color:var(--ink-3);"><rect x="2" y="6" width="20" height="14" rx="2" ry="2"/><circle cx="12" cy="13" r="4"/><path d="M17 6V4a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v2"/></svg>
         <p>Tocá para sacar foto o subir imagen</p>
         <small>JPG, PNG — se comprime automáticamente</small>
       </div>
@@ -375,42 +423,22 @@
           <textarea id="photo-context" placeholder="Ej: la milanesa es de pollo, hecha en air fryer, el puré no tiene crema..."></textarea>
         </div>
       </div>
+    </div>
 
-      <div class="loading-state" id="loading-state">
-        <div class="loading-dots"><span></span><span></span><span></span></div>
-        <p>Analizando tu plato con IA…</p>
+    <!-- TEXT TAB -->
+    <div class="tab-content" id="tab-text">
+      <div class="text-ai-panel">
+        <div class="text-ai-title">Sin foto, solo texto</div>
+        <p class="text-ai-sub">Escribí un alimento simple o una comida completa y la IA estimará una porción razonable.</p>
       </div>
 
-      <div class="ai-result" id="ai-result">
-        <div class="result-name" id="result-name"></div>
-        <div class="macros-grid">
-          <div class="macro-box">
-            <div class="mval" id="res-kcal">—</div>
-            <div class="mlabel">kcal</div>
-          </div>
-          <div class="macro-box">
-            <div class="mval" id="res-protein">—</div>
-            <div class="mlabel">Prot.</div>
-          </div>
-          <div class="macro-box">
-            <div class="mval" id="res-carbs">—</div>
-            <div class="mlabel">Carbos</div>
-          </div>
-          <div class="macro-box">
-            <div class="mval" id="res-fat">—</div>
-            <div class="mlabel">Grasas</div>
-          </div>
-        </div>
-        <div class="ai-note" id="res-note"></div>
+      <div class="form-row">
+        <label>Qué comiste</label>
+        <textarea id="text-input" placeholder="Ej: manzana grande, 2 tostadas con manteca, plato de fideos con salsa y queso" oninput="toggleTextAnalyzeButton()"></textarea>
       </div>
 
-      <div class="save-food-toggle" id="save-toggle" style="display:none;">
-        <input type="checkbox" id="save-to-library" />
-        <label for="save-to-library">Guardar en mis comidas para usar de nuevo</label>
-      </div>
-
-      <button class="btn-primary btn-green" id="add-photo-btn" style="display:none;margin-top:0;" onclick="addFoodFromPhoto()">
-        Agregar al registro ✅
+      <button class="analyze-btn" id="analyze-text-btn" onclick="analyzeTextFood()" disabled>
+        Analizar texto →
       </button>
     </div>
 
@@ -448,13 +476,54 @@
         <input type="checkbox" id="save-manual" />
         <label for="save-manual">Guardar en mis comidas para usar de nuevo</label>
       </div>
-      <button class="btn-primary btn-green" style="margin-top:0;" onclick="addManualFood()">Agregar →</button>
+      <button class="btn-primary btn-green" id="manual-add-btn" style="margin-top:0;" onclick="addManualFood()">Agregar →</button>
     </div>
 
     <!-- SAVED TAB -->
     <div class="tab-content" id="tab-saved">
       <div id="saved-foods-list"></div>
     </div>
+
+    <div class="loading-state" id="loading-state">
+      <div class="loading-dots"><span></span><span></span><span></span></div>
+      <p id="loading-message">Analizando tu plato con IA…</p>
+    </div>
+
+    <div class="ai-result" id="ai-result">
+      <div class="form-row">
+        <label>Nombre del plato</label>
+        <input type="text" id="edit-name" placeholder="Ej: Milanesa con puré" />
+      </div>
+      <div class="macros-grid">
+        <div class="macro-box">
+          <input type="number" id="edit-kcal" class="mval-input" placeholder="0" />
+          <div class="mlabel">kcal</div>
+        </div>
+        <div class="macro-box">
+          <input type="number" id="edit-protein" class="mval-input" placeholder="0" step="0.1" />
+          <div class="mlabel">Prot.</div>
+        </div>
+        <div class="macro-box">
+          <input type="number" id="edit-carbs" class="mval-input" placeholder="0" step="0.1" />
+          <div class="mlabel">Carbos</div>
+        </div>
+        <div class="macro-box">
+          <input type="number" id="edit-fat" class="mval-input" placeholder="0" step="0.1" />
+          <div class="mlabel">Grasas</div>
+        </div>
+      </div>
+      <div class="ai-note" id="res-note"></div>
+      <div class="ingredients-list" id="ingredients-list"></div>
+    </div>
+
+    <div class="save-food-toggle" id="save-toggle" style="display:none;">
+      <input type="checkbox" id="save-to-library" />
+      <label for="save-to-library">Guardar en mis comidas para usar de nuevo</label>
+    </div>
+
+    <button class="btn-primary btn-green" id="add-food-btn" style="display:none;margin-top:0;" onclick="addFoodFromAi()">
+      Agregar al registro
+    </button>
 
   </div>
 </div>
