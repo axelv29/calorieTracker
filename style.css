@@ -596,7 +596,7 @@ h1, h2, h3, .display {
     display: block;
   }
 
-  .app-sidebar { display: none; }
+  .app-sidebar { display: none !important; }
   .app-main {
     padding: 20px 16px;
     height: calc(100vh - 62px);
