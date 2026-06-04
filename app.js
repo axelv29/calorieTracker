@@ -70,27 +70,56 @@ function parseAiJson(text) {
   return JSON.parse(clean);
 }
 
+function validUnit(u) {
+  return (u === 'g' || u === 'kg' || u === 'ml' || u === 'L') ? u : 'g';
+}
+
+function formatWeight(value, unit) {
+  if (!value && value !== 0) return '';
+  const u = validUnit(unit);
+  if (u === 'kg' || u === 'L') {
+    const v = Number(value);
+    if (v >= 1) return Math.round(v * 10) / 10 + u;
+    return Math.round(v * 100) / 100 + u;
+  }
+  return Math.round(value) + u;
+}
+
+function roundWeight(value, unit) {
+  const u = validUnit(unit);
+  if (u === 'kg' || u === 'L') {
+    const v = Number(value) || 0;
+    return Math.round(v * 100) / 100;
+  }
+  return Math.round(Number(value) || 0);
+}
+
 function normalizeAiFood(food, fallbackWeight) {
   // New format: meals[] array — flatten into meals with ingredients
   if (Array.isArray(food?.meals) && food.meals.length > 0) {
     const meals = food.meals.map(m => {
-      const ingredients = Array.isArray(m.ingredients) ? m.ingredients.map(i => ({
-        name: String(i?.name || '').trim(),
-        weight: Math.round(Number(i?.weight) || 0),
-        kcal: Math.round(Number(i?.kcal) || 0),
-        protein: Math.round((Number(i?.protein) || 0) * 10) / 10,
-        carbs:   Math.round((Number(i?.carbs)   || 0) * 10) / 10,
-        fat:     Math.round((Number(i?.fat)      || 0) * 10) / 10,
-      })) : [];
+      const ingredients = Array.isArray(m.ingredients) ? m.ingredients.map(i => {
+        const iUnit = validUnit(i?.weightUnit);
+        return {
+          name: String(i?.name || '').trim(),
+          weight: roundWeight(i?.weight, iUnit),
+          weightUnit: iUnit,
+          kcal: Math.round(Number(i?.kcal) || 0),
+          protein: Math.round((Number(i?.protein) || 0) * 10) / 10,
+          carbs:   Math.round((Number(i?.carbs)   || 0) * 10) / 10,
+          fat:     Math.round((Number(i?.fat)      || 0) * 10) / 10,
+        };
+      }) : [];
 
       // Always recompute meal totals from its ingredients
       const kcal    = ingredients.reduce((s, i) => s + i.kcal, 0);
       const protein = Math.round(ingredients.reduce((s, i) => s + i.protein, 0) * 10) / 10;
       const carbs   = Math.round(ingredients.reduce((s, i) => s + i.carbs,   0) * 10) / 10;
       const fat     = Math.round(ingredients.reduce((s, i) => s + i.fat,     0) * 10) / 10;
-      const weight  = ingredients.reduce((s, i) => s + i.weight, 0) || Math.round(Number(m?.weight) || 0);
+      const weight  = ingredients.reduce((s, i) => s + i.weight, 0) || roundWeight(m?.weight, m?.weightUnit);
+      const weightUnit = ingredients.length > 0 ? ingredients[0].weightUnit : validUnit(m?.weightUnit);
 
-      return { name: String(m?.name || '').trim(), kcal, protein, carbs, fat, weight, ingredients };
+      return { name: String(m?.name || '').trim(), kcal, protein, carbs, fat, weight, weightUnit, ingredients };
     });
 
     // Root totals = sum of all meals
@@ -99,10 +128,11 @@ function normalizeAiFood(food, fallbackWeight) {
     const carbs   = Math.round(meals.reduce((s, m) => s + m.carbs,   0) * 10) / 10;
     const fat     = Math.round(meals.reduce((s, m) => s + m.fat,     0) * 10) / 10;
     const weight  = meals.reduce((s, m) => s + m.weight, 0) || null;
+    const weightUnit = meals.length > 0 ? meals[0].weightUnit : 'g';
     const name    = String(food?.name || meals.map(m => m.name).join(' + ')).trim();
 
-    const normalized = { name, kcal, protein, carbs, fat, weight, note: String(food?.note || '').trim(), meals };
-    if (fallbackWeight && !normalized.weight) normalized.weight = parseInt(fallbackWeight, 10);
+    const normalized = { name, kcal, protein, carbs, fat, weight, weightUnit, note: String(food?.note || '').trim(), meals };
+    if (fallbackWeight && !normalized.weight) { normalized.weight = parseInt(fallbackWeight, 10); normalized.weightUnit = 'g'; }
     return normalized;
   }
 
@@ -114,21 +144,27 @@ function normalizeAiFood(food, fallbackWeight) {
     carbs:   Number(food?.carbs)   || 0,
     fat:     Number(food?.fat)     || 0,
     weight:  food?.weight ?? null,
+    weightUnit: validUnit(food?.weightUnit),
     note:    String(food?.note || '').trim(),
     meals: [],
   };
 
-  const legacyIngredients = Array.isArray(food?.ingredients) ? food.ingredients.map(i => ({
-    name:    String(i?.name || '').trim(),
-    weight:  Math.round(Number(i?.weight) || 0),
-    kcal:    Math.round(Number(i?.kcal)   || 0),
-    protein: Math.round((Number(i?.protein) || 0) * 10) / 10,
-    carbs:   Math.round((Number(i?.carbs)   || 0) * 10) / 10,
-    fat:     Math.round((Number(i?.fat)     || 0) * 10) / 10,
-  })) : [];
+  const legacyIngredients = Array.isArray(food?.ingredients) ? food.ingredients.map(i => {
+    const iUnit = validUnit(i?.weightUnit);
+    return {
+      name:    String(i?.name || '').trim(),
+      weight:  roundWeight(i?.weight, iUnit),
+      weightUnit: iUnit,
+      kcal:    Math.round(Number(i?.kcal)   || 0),
+      protein: Math.round((Number(i?.protein) || 0) * 10) / 10,
+      carbs:   Math.round((Number(i?.carbs)   || 0) * 10) / 10,
+      fat:     Math.round((Number(i?.fat)     || 0) * 10) / 10,
+    };
+  }) : [];
 
   if (legacyIngredients.length > 0) {
-    normalized.meals = [{ name: normalized.name, kcal: normalized.kcal, protein: normalized.protein, carbs: normalized.carbs, fat: normalized.fat, weight: normalized.weight, ingredients: legacyIngredients }];
+    const unit = legacyIngredients[0].weightUnit;
+    normalized.meals = [{ name: normalized.name, kcal: normalized.kcal, protein: normalized.protein, carbs: normalized.carbs, fat: normalized.fat, weight: normalized.weight, weightUnit: unit, ingredients: legacyIngredients }];
     const sumKcal = legacyIngredients.reduce((s, i) => s + i.kcal, 0);
     if (sumKcal > 0) {
       normalized.kcal    = sumKcal;
@@ -138,7 +174,7 @@ function normalizeAiFood(food, fallbackWeight) {
     }
   }
 
-  if (fallbackWeight && !normalized.weight) normalized.weight = parseInt(fallbackWeight, 10);
+  if (fallbackWeight && !normalized.weight) { normalized.weight = parseInt(fallbackWeight, 10); normalized.weightUnit = 'g'; }
   return normalized;
 }
 
@@ -165,10 +201,11 @@ function finishAiAnalysis(buttonId) {
   if (btn) btn.disabled = false;
 }
 
-function toggleTextAnalyzeButton() {
-  const input = document.getElementById('text-input');
-  const btn = document.getElementById('analyze-text-btn');
-  if (btn && input) btn.disabled = !input.value.trim();
+function toggleAiAnalyzeButton() {
+  const desc = document.getElementById('photo-context').value.trim();
+  const hasPhotos = selectedPhotos.length > 0;
+  const btn = document.getElementById('analyze-btn');
+  if (btn) btn.disabled = !desc && !hasPhotos;
 }
 
 function showAiFoodResult(food, fallbackWeight) {
@@ -187,11 +224,9 @@ function showAiFoodResult(food, fallbackWeight) {
   document.getElementById('add-food-btn').style.display = 'block';
 }
 
-function buildPhotoPrompt(weight, context) {
-  const weightText = weight ? ` El usuario indica que la porción total pesa ${weight} gramos.` : '';
-  const contextText = context ? ` Contexto adicional: "${context}".` : '';
+function buildAiPrompt(description, weight) {
   const json = `{
-  "name": "Nombre comida 1 + Nombre comida 2",
+  "name": "Nombre comida",
   "kcal": 0,
   "protein": 0,
   "carbs": 0,
@@ -205,54 +240,51 @@ function buildPhotoPrompt(weight, context) {
       "carbs": 0,
       "fat": 0,
       "weight": 0,
+      "weightUnit": "g",
       "ingredients": [
-        { "name": "ingrediente", "weight": 0, "kcal": 0, "protein": 0, "carbs": 0, "fat": 0 }
+        { "name": "ingrediente", "weight": 0, "weightUnit": "g", "kcal": 0, "protein": 0, "carbs": 0, "fat": 0 }
       ]
     }
   ]
 }`;
-  return `Actuá como un nutricionista profesional con acceso a tablas nutricionales detalladas. Recibís una o más fotos — cada una puede ser una comida distinta O una etiqueta nutricional.
-${weightText ? '\n' + weightText : ''}${contextText ? '\n' + contextText : ''}
+  const hasPhotos = selectedPhotos.length > 0;
+  let intro = hasPhotos
+    ? 'Actuá como un nutricionista profesional con acceso a tablas nutricionales detalladas. Recibís una o más fotos — cada una puede ser una comida distinta O una etiqueta nutricional.'
+    : 'Actuá como un nutricionista profesional con acceso a tablas nutricionales detalladas. El usuario describió una comida sin foto.';
 
-REGLAS:
-- Para cada foto de comida, identificá todos los ingredientes visibles y estimá su peso en gramos de forma REALISTA según lo que se ve en la imagen. Basate en proporciones visuales y recetas estándar.
-- Si una foto es una etiqueta nutricional, usá esos valores exactos para el ingrediente correspondiente.
-- Calculá kcal y macros de cada ingrediente desde su peso × valores nutricionales por 100g.
-- El total de cada comida debe ser la suma EXACTA de sus ingredientes. Verificá antes de responder.
-- El objeto raíz (kcal/protein/carbs/fat) debe ser la suma EXACTA de todas las comidas.
+  let parts = [];
+  if (hasPhotos) parts.push('- Para cada foto de comida, identificá todos los ingredientes visibles y estimá su peso de forma REALISTA según lo que se ve en la imagen. Basate en proporciones visuales y recetas estándar.');
+  if (description) parts.push(`- Descripción del usuario: "${description}". Prestá MUCHA atención a las cantidades, porciones y modificaciones que mencione.`);
+  parts.push('- Si una foto es una etiqueta nutricional, usá esos valores exactos para el ingrediente correspondiente.');
+  parts.push('- Calculá kcal y macros de cada ingrediente desde su peso × valores nutricionales por 100g.');
+  parts.push('- El total de cada comida debe ser la suma EXACTA de sus ingredientes. Verificá antes de responder.');
+  parts.push('- El objeto raíz (kcal/protein/carbs/fat) debe ser la suma EXACTA de todas las comidas.');
+
+  let weightText = '';
+  if (weight) {
+    weightText = `\nEl usuario indica que la porción total pesa ${weight} gramos. Usá este dato como referencia para escalar los ingredientes.`;
+  }
+
+  return `${intro}
+${weightText}
+
+REGLAS IMPORTANTES:
+${parts.map(p => '\n' + p).join('')}
+
+REGLAS DE UNIDADES:
+- Para cada ingrediente, usá la unidad adecuada: líquidos en ml o L, sólidos en g o kg.
+- Ej: leche → 200 ml, agua → 250 ml, arroz → 150 g, pollo → 200 g, papa → 300 g, gaseosa → 350 ml.
+- Si un peso supera los 1000 g, expresalo en kg (ej: 1.5 kg en vez de 1500 g).
+- El campo "weightUnit" debe ser "ml", "L", "g" o "kg".
+
+ATENCIÓN A PORCIONES:
+- Si el usuario dice "la mitad", "medio plato", "poco", "chico", reducí los pesos a ~50% de una porción normal.
+- Si dice "grande", "bien servido", "extra", aumentá los pesos a ~130-150% de una porción normal.
+- Si dice "mediano", "normal", "estándar" usá la porción típica.
+- Prestá MUCHA atención a calificativos de tamaño y cantidad. Una "manzana grande" no pesa lo mismo que una "manzana chica".
+- Si menciona "2 tostadas", "3 galletitas", "medio plato" etc., usá exactamente esa cantidad.
 
 Respondé SOLO con JSON válido siguiendo exactamente este esquema (reemplazá los 0 y textos de ejemplo con los valores reales):
-${json}`;
-}
-function buildTextPrompt(description) {
-  const json = `{
-  "name": "nombre del plato",
-  "kcal": 0,
-  "protein": 0,
-  "carbs": 0,
-  "fat": 0,
-  "note": "breve nota",
-  "meals": [
-    {
-      "name": "nombre del plato",
-      "kcal": 0,
-      "protein": 0,
-      "carbs": 0,
-      "fat": 0,
-      "weight": 0,
-      "ingredients": [
-        { "name": "ingrediente", "weight": 0, "kcal": 0, "protein": 0, "carbs": 0, "fat": 0 }
-      ]
-    }
-  ]
-}`;
-  return `Actuá como un nutricionista profesional. El usuario describió una comida con texto (sin foto).
-
-Descripción: "${description}"
-
-Interpretá porciones razonables para un contexto uruguayo/rioplatense. Estimá el peso de cada ingrediente en gramos de forma realista. Calculá kcal y macros desde el peso × valores por 100g. Los totales deben ser la suma EXACTA de los ingredientes.
-
-Respondé SOLO con JSON válido siguiendo este esquema (reemplazá los 0 con los valores reales):
 ${json}`;
 }
 function getMinCalories(profile) {
@@ -709,7 +741,7 @@ function renderHome() {
               <div class="food-info">
                 <div class="food-name">${escHtml(f.name)}</div>
                 <div class="food-meta">
-                  ${f.weight ? f.weight + 'g · ' : ''}P: ${Math.round(f.protein||0)}g · C: ${Math.round(f.carbs||0)}g · G: ${Math.round(f.fat||0)}g
+                  ${f.weight ? formatWeight(f.weight, f.weightUnit) + ' · ' : ''}P: ${Math.round(f.protein||0)}g · C: ${Math.round(f.carbs||0)}g · G: ${Math.round(f.fat||0)}g
                 </div>
               </div>
               <span class="food-kcal">${f.kcal} kcal</span>
@@ -1352,20 +1384,16 @@ function resetModal() {
   const loadingMessage = document.getElementById('loading-message');
   if (loadingMessage) loadingMessage.textContent = 'Analizando tu plato con IA…';
   document.getElementById('analyze-btn').disabled = true;
-  const textBtn = document.getElementById('analyze-text-btn');
-  if (textBtn) textBtn.disabled = true;
   document.getElementById('photo-weight').value = '';
   document.getElementById('photo-context').value = '';
   document.getElementById('photo-input').value = '';
-  const textInput = document.getElementById('text-input');
-  if (textInput) textInput.value = '';
   document.getElementById('ingredients-list').style.display = 'none';
   selectedPhotos = [];
   aiParsedFood = null;
 }
 
 function switchTab(tab) {
-  ['photo','text','manual','saved'].forEach(t => {
+  ['photo','manual','saved'].forEach(t => {
     document.getElementById('tab-' + t).classList.toggle('active', t === tab);
   });
   document.querySelectorAll('.tab-btn').forEach((btn) => {
@@ -1418,6 +1446,7 @@ function onAllPhotosLoaded() {
   document.getElementById('add-food-btn').style.display = 'none';
   document.getElementById('save-toggle').style.display = 'none';
   document.getElementById('correction-section').style.display = 'none';
+  toggleAiAnalyzeButton();
 }
 
 function renderPhotoPreviews() {
@@ -1441,7 +1470,6 @@ function removePhoto(index) {
   if (selectedPhotos.length === 0) {
     document.getElementById('photo-previews').style.display = 'none';
     document.getElementById('photo-drop').classList.remove('has-photos');
-    document.getElementById('analyze-btn').disabled = true;
     document.getElementById('ai-result').style.display = 'none';
     document.getElementById('add-food-btn').style.display = 'none';
     document.getElementById('save-toggle').style.display = 'none';
@@ -1449,6 +1477,7 @@ function removePhoto(index) {
   } else {
     renderPhotoPreviews();
   }
+  toggleAiAnalyzeButton();
 }
 
 function addMorePhotos() {
@@ -1457,8 +1486,14 @@ function addMorePhotos() {
   input.click();
 }
 
-async function analyzePhoto() {
-  if (!selectedPhotos.length) return;
+async function analyzeAiFood() {
+  const description = document.getElementById('photo-context').value.trim();
+  const hasPhotos = selectedPhotos.length > 0;
+
+  if (!description && !hasPhotos) {
+    showToast('Subí una foto o escribí una descripción');
+    return;
+  }
 
   const apiKey = currentProfile.apiKey;
   if (!apiKey) {
@@ -1467,17 +1502,18 @@ async function analyzePhoto() {
   }
 
   const weight = document.getElementById('photo-weight').value;
-  const context = document.getElementById('photo-context').value.trim();
-  const prompt = buildPhotoPrompt(weight, context);
+  const prompt = buildAiPrompt(description, weight);
 
   try {
     await runAiAnalysis({
       apiKey,
       buttonId: 'analyze-btn',
-      images: selectedPhotos.map(p => p.base64),
+      images: hasPhotos ? selectedPhotos.map(p => p.base64) : [],
       prompt,
       fallbackWeight: weight,
-      loadingMessage: 'Analizando tus fotos con IA…',
+      loadingMessage: hasPhotos
+        ? 'Analizando fotos y descripción con IA…'
+        : 'Analizando descripción con IA…',
     });
     document.getElementById('correction-section').style.display = 'block';
   } catch (err) {
@@ -1491,39 +1527,13 @@ async function analyzePhoto() {
   }
 }
 
-async function analyzeTextFood() {
-  const description = document.getElementById('text-input').value.trim();
-  if (!description) {
-    showToast('Escribí algo para analizar');
-    return;
-  }
-
-  const apiKey = currentProfile.apiKey;
-  if (!apiKey) {
-    showToast('Configurá tu API Key de Gemini en Ajustes');
-    return;
-  }
-
-  try {
-    await runAiAnalysis({
-      apiKey,
-      buttonId: 'analyze-text-btn',
-      prompt: buildTextPrompt(description),
-      loadingMessage: 'Interpretando tu texto con IA…',
-    });
-  } catch (err) {
-    if (err.message === 'Failed to fetch') {
-      showToast('Sin conexión o API Key incorrecta');
-    } else {
-      showToast('Error: ' + err.message.slice(0, 60));
-    }
-  } finally {
-    finishAiAnalysis('analyze-text-btn');
-  }
-}
-
 function buildCorrectionPrompt(correction, currentFood) {
-  return `Actuá como un nutricionista profesional. Ya analicé una o más fotos de comida y obtuve esta estimación:
+  const hasPhotos = selectedPhotos.length > 0;
+  const photoText = hasPhotos
+    ? 'Re-analizá las fotos teniendo en cuenta la corrección y devolvé SOLO un JSON válido'
+    : 'Teniendo en cuenta la corrección, devolvé SOLO un JSON válido';
+
+  return `Actuá como un nutricionista profesional. Ya analicé una comida${hasPhotos ? ' con foto(s)' : ''} y obtuve esta estimación:
 
 Nombre: "${currentFood.name}"
 Calorías: ${currentFood.kcal} kcal
@@ -1533,7 +1543,7 @@ Grasas: ${currentFood.fat}g
 
 El usuario indica la siguiente corrección: "${correction}"
 
-Re-analizá las fotos teniendo en cuenta la corrección y devolvé SOLO un JSON válido, sin markdown ni texto extra, con el mismo formato:
+${photoText}, sin markdown ni texto extra, con el mismo formato:
 {
   "name": "nombre del plato",
   "kcal": número,
@@ -1541,9 +1551,10 @@ Re-analizá las fotos teniendo en cuenta la corrección y devolvé SOLO un JSON 
   "carbs": gramos,
   "fat": gramos,
   "weight": número o null,
+  "weightUnit": "g",
   "note": "breve nota",
   "ingredients": [
-    { "name": "componente", "kcal": número, "protein": gramos, "carbs": gramos, "fat": gramos }
+    { "name": "componente", "weight": número, "weightUnit": "g", "kcal": número, "protein": gramos, "carbs": gramos, "fat": gramos }
   ]
 }`;
 }
@@ -1571,7 +1582,7 @@ async function correctAiResult() {
     await runAiAnalysis({
       apiKey,
       buttonId: 'correction-btn',
-      images: selectedPhotos.map(p => p.base64),
+      images: selectedPhotos.length > 0 ? selectedPhotos.map(p => p.base64) : [],
       prompt,
       loadingMessage: 'Aplicando corrección…',
     });
@@ -1632,6 +1643,7 @@ function addFoodFromAi() {
     carbs: parseFloat(document.getElementById('edit-carbs').value) || aiParsedFood.carbs,
     fat: parseFloat(document.getElementById('edit-fat').value) || aiParsedFood.fat,
     weight: aiParsedFood.weight,
+    weightUnit: aiParsedFood.weightUnit || 'g',
     ingredients: aiParsedFood.ingredients || []
   };
 
@@ -1667,7 +1679,7 @@ function renderMeals(meals) {
 
   el.innerHTML = meals.map(meal => {
     const hasIngredients = meal.ingredients && meal.ingredients.length > 0;
-    const mealWeight = meal.weight ? `<span class="ingredient-meal-weight">${meal.weight}g total</span>` : '';
+    const mealWeight = meal.weight ? `<span class="ingredient-meal-weight">${formatWeight(meal.weight, meal.weightUnit)} total</span>` : '';
 
     const header = multiMeal || meal.name
       ? `<div class="ingredient-meal-header">
@@ -1680,7 +1692,7 @@ function renderMeals(meals) {
       <div class="ingredient-item">
         <div class="ingredient-name-col">
           <span class="ingredient-name">${escHtml(ing.name)}</span>
-          ${ing.weight ? `<span class="ingredient-weight">${ing.weight}g</span>` : ''}
+          ${ing.weight ? `<span class="ingredient-weight">${formatWeight(ing.weight, ing.weightUnit)}</span>` : ''}
         </div>
         <div class="ingredient-macros">
           <span class="ing-kcal">${ing.kcal} kcal</span>
@@ -1711,6 +1723,7 @@ function addManualFood() {
   const food = {
     name, kcal,
     weight: parseInt(document.getElementById('manual-weight').value) || null,
+    weightUnit: 'g',
     protein: parseFloat(document.getElementById('manual-protein').value) || 0,
     carbs: parseFloat(document.getElementById('manual-carbs').value) || 0,
     fat: parseFloat(document.getElementById('manual-fat').value) || 0,
@@ -1724,7 +1737,7 @@ function addManualFood() {
   } else if (editingFoodId !== null) {
     // Editing saved food (editingFoodId is the index in savedFoods)
     const profiles = getProfiles();
-    profiles[currentProfile.id].savedFoods[editingFoodId] = { name: food.name, kcal: food.kcal, protein: food.protein, carbs: food.carbs, fat: food.fat, weight: food.weight };
+    profiles[currentProfile.id].savedFoods[editingFoodId] = { name: food.name, kcal: food.kcal, protein: food.protein, carbs: food.carbs, fat: food.fat, weight: food.weight, weightUnit: food.weightUnit };
     saveProfiles(profiles);
     currentProfile = profiles[currentProfile.id];
     editingFoodId = null;
@@ -1746,7 +1759,7 @@ function saveToLibrary(food) {
   const p = profiles[currentProfile.id];
   if (!p.savedFoods) p.savedFoods = [];
   if (!p.savedFoods.find(f => f.name === food.name)) {
-    p.savedFoods.push({ name: food.name, kcal: food.kcal, protein: food.protein, carbs: food.carbs, fat: food.fat, weight: food.weight });
+    p.savedFoods.push({ name: food.name, kcal: food.kcal, protein: food.protein, carbs: food.carbs, fat: food.fat, weight: food.weight, weightUnit: food.weightUnit || 'g' });
     saveProfiles(profiles);
     currentProfile = profiles[currentProfile.id];
   }
@@ -1767,7 +1780,7 @@ function renderSavedFoodsList() {
     <div class="saved-food-item" onclick="addSavedFood(${i})">
       <div class="saved-food-info">
         <div class="saved-food-name">${escHtml(f.name)}</div>
-        <div class="saved-food-meta">${f.weight ? f.weight+'g · ' : ''}P:${Math.round(f.protein||0)}g C:${Math.round(f.carbs||0)}g G:${Math.round(f.fat||0)}g</div>
+        <div class="saved-food-meta">${f.weight ? formatWeight(f.weight, f.weightUnit) + ' · ' : ''}P:${Math.round(f.protein||0)}g C:${Math.round(f.carbs||0)}g G:${Math.round(f.fat||0)}g</div>
       </div>
       <span class="saved-food-kcal">${f.kcal} kcal</span>
     </div>

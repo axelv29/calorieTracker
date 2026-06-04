@@ -687,8 +687,7 @@
     </div>
 
     <div class="tab-bar">
-      <button class="tab-btn active" data-tab="photo" onclick="switchTab('photo')"><i class="ph-fill ph-camera tab-icon" aria-hidden="true"></i>Foto IA</button>
-      <button class="tab-btn" data-tab="text" onclick="switchTab('text')"><i class="ph-fill ph-pencil-simple tab-icon" aria-hidden="true"></i>Texto IA</button>
+      <button class="tab-btn active" data-tab="photo" onclick="switchTab('photo')"><i class="ph-fill ph-robot tab-icon" aria-hidden="true"></i>IA</button>
       <button class="tab-btn" data-tab="manual" onclick="switchTab('manual')"><i class="ph-fill ph-note-pencil tab-icon" aria-hidden="true"></i>Manual</button>
       <button class="tab-btn" data-tab="saved" onclick="switchTab('saved')"><i class="ph-fill ph-bookmarks tab-icon" aria-hidden="true"></i>Guardadas</button>
     </div>
@@ -704,48 +703,36 @@
       </div>
     </div>
 
-    <!-- PHOTO TAB -->
+    <!-- IA TAB (foto + texto) -->
     <div class="tab-content active" id="tab-photo">
+      <div class="text-ai-panel">
+        <div class="text-ai-title">Foto y/o texto</div>
+        <p class="text-ai-sub">Subí una foto, escribí una descripción, o ambas. La IA analiza todo junto para mayor precisión.</p>
+      </div>
+
       <div class="photo-previews" id="photo-previews"></div>
 
       <div class="photo-drop" id="photo-drop">
         <input type="file" id="photo-input" accept="image/*" multiple onchange="handlePhotoSelect(event)" />
         <i class="ph ph-camera" aria-hidden="true" style="font-size: 32px; color: var(--ink-3); display: block; margin: 0 auto 8px;"></i>
         <p>Tocá para sacar foto o subir imágenes</p>
-        <small>JPG, PNG — varias fotos permitidas</small>
-      </div>
-
-      <div class="form-row-2" style="margin-top: 14px; align-items: flex-end;">
-        <div class="form-row" style="margin: 0;">
-          <label>Peso de la porción (opcional)</label>
-          <input type="number" id="photo-weight" placeholder="Ej: 250 g" step="1" min="1" />
-        </div>
-        <button class="analyze-btn" id="analyze-btn" onclick="analyzePhoto()" disabled style="height: 41px;">
-          Analizar →
-        </button>
+        <small>JPG, PNG — varias fotos permitidas (opcional)</small>
       </div>
 
       <div class="form-row" style="margin-top: 14px;">
-        <label>Contexto extra para la IA (opcional)</label>
-        <textarea id="photo-context" placeholder="Ej: la milanesa es de pollo, hecha en air fryer, el puré no tiene crema..."></textarea>
-      </div>
-    </div>
-
-    <!-- TEXT TAB -->
-    <div class="tab-content" id="tab-text">
-      <div class="text-ai-panel">
-        <div class="text-ai-title">Sin foto, solo texto</div>
-        <p class="text-ai-sub">Escribí un alimento simple o una comida completa y la IA estimará una porción razonable.</p>
+        <label>Descripción de la comida (opcional si hay foto)</label>
+        <textarea id="photo-context" placeholder="Ej: milanesa de pollo, hecha en air fryer, el puré no tiene crema. Si no hay foto describí todo: manzana grande, 2 tostadas con manteca, plato de fideos..." oninput="toggleAiAnalyzeButton()"></textarea>
       </div>
 
-      <div class="form-row">
-        <label>Qué comiste</label>
-        <textarea id="text-input" placeholder="Ej: manzana grande, 2 tostadas con manteca, plato de fideos con salsa y queso" oninput="toggleTextAnalyzeButton()"></textarea>
+      <div class="form-row-2" style="margin-top: 12px; align-items: flex-end;">
+        <div class="form-row" style="margin: 0;">
+          <label>Peso total aprox. (opcional)</label>
+          <input type="number" id="photo-weight" placeholder="Ej: 250" step="1" min="1" />
+        </div>
+        <button class="analyze-btn" id="analyze-btn" onclick="analyzeAiFood()" disabled style="height: 41px;">
+          Analizar →
+        </button>
       </div>
-
-      <button class="analyze-btn" id="analyze-text-btn" onclick="analyzeTextFood()" disabled>
-        Analizar texto →
-      </button>
     </div>
 
     <!-- MANUAL TAB -->
