@@ -307,9 +307,6 @@
           <button class="icon-btn" onclick="goToDate(-1)" title="Día anterior"><i class="ph-fill ph-caret-left" aria-hidden="true"></i></button>
           <button class="icon-btn" onclick="goToDate(1)" title="Día siguiente"><i class="ph-fill ph-caret-right" aria-hidden="true"></i></button>
           <button class="icon-btn" onclick="goToToday()" style="font-size:11px;font-weight:700;">hoy</button>
-          <button class="mobile-add-btn" onclick="openExerciseModal()" style="display:flex;">
-            <i class="ph ph-plus" aria-hidden="true"></i> Agregar ejercicio
-          </button>
         </div>
       </div>
 
@@ -709,13 +706,13 @@
 
     <!-- PHOTO TAB -->
     <div class="tab-content active" id="tab-photo">
-      <img id="photo-preview" class="photo-preview" alt="preview" />
+      <div class="photo-previews" id="photo-previews"></div>
 
       <div class="photo-drop" id="photo-drop">
-        <input type="file" id="photo-input" accept="image/*" onchange="handlePhotoSelect(event)" />
+        <input type="file" id="photo-input" accept="image/*" multiple onchange="handlePhotoSelect(event)" />
         <i class="ph ph-camera" aria-hidden="true" style="font-size: 32px; color: var(--ink-3); display: block; margin: 0 auto 8px;"></i>
-        <p>Tocá para sacar foto o subir imagen</p>
-        <small>JPG, PNG — se comprime automáticamente</small>
+        <p>Tocá para sacar foto o subir imágenes</p>
+        <small>JPG, PNG — varias fotos permitidas</small>
       </div>
 
       <div class="form-row-2" style="margin-top: 14px; align-items: flex-end;">
@@ -839,6 +836,16 @@
     <button class="btn-primary btn-green" id="add-food-btn" style="display:none;margin-top:0;" onclick="addFoodFromAi()">
       Agregar al registro
     </button>
+
+    <div class="correction-section" id="correction-section" style="display:none;">
+      <div class="correction-divider"></div>
+      <label class="correction-label">Corregir con IA</label>
+      <p class="correction-sub">Decile a la IA qué ajustar (tamaño de porción, ingrediente faltante, etc.)</p>
+      <textarea id="correction-input" placeholder="Ej: la milanesa era chica, no grande / faltó contar el aceite / la porción de arroz era más grande..."></textarea>
+      <button class="analyze-btn" id="correction-btn" onclick="correctAiResult()">
+        Corregir →
+      </button>
+    </div>
 
   </div>
 </div>
