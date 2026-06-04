@@ -129,13 +129,19 @@
     <button class="nav-link" data-page="stats" onclick="showPage('stats')">
       <i class="ph-fill ph-chart-line-up nav-icon" aria-hidden="true"></i> Estadísticas
     </button>
+    <button class="nav-link" data-page="exercise" onclick="showPage('exercise')">
+      <i class="ph-fill ph-lightning nav-icon" aria-hidden="true"></i> Ejercicio
+    </button>
     <button class="nav-link" data-page="settings" onclick="showPage('settings')">
       <i class="ph-fill ph-gear-six nav-icon" aria-hidden="true"></i> Ajustes
     </button>
 
     <div class="sidebar-add-btn">
-      <button onclick="openModal()">
+      <button onclick="openModal()" id="sidebar-add-food-btn">
         <i class="ph ph-plus" aria-hidden="true"></i> Agregar comida
+      </button>
+      <button onclick="openExerciseModal()" id="sidebar-add-exercise-btn" style="display:none; margin-top:8px; background:var(--primary-dark);">
+        <i class="ph ph-lightning" aria-hidden="true"></i> Agregar ejercicio
       </button>
     </div>
   </aside>
@@ -275,7 +281,96 @@
         </div>
 
       </div><!-- /dashboard-grid -->
+
+      <!-- Net balance from exercise (hidden when no exercise) -->
+      <div class="net-balance-card" id="home-net-balance" style="display:none; margin-top:16px;">
+        <div>
+          <div class="net-balance-label">Balance neto del día</div>
+          <div class="net-balance-sub" id="home-net-balance-sub"></div>
+        </div>
+        <div class="net-balance-right">
+          <div class="net-balance-value" id="home-net-balance-val">—</div>
+          <div style="font-size:9px;color:var(--ink-3);font-weight:600;">vs meta + ejercicio</div>
+        </div>
+      </div>
+
     </div><!-- /page-home -->
+
+    <!-- ===== EXERCISE PAGE ===== -->
+    <div id="page-exercise" class="page">
+      <div class="page-header">
+        <div class="page-header-left">
+          <h2 id="exercise-header-day">Ejercicio</h2>
+          <div class="date-label" id="exercise-header-date"></div>
+        </div>
+        <div class="header-actions">
+          <button class="icon-btn" onclick="goToDate(-1)" title="Día anterior"><i class="ph-fill ph-caret-left" aria-hidden="true"></i></button>
+          <button class="icon-btn" onclick="goToDate(1)" title="Día siguiente"><i class="ph-fill ph-caret-right" aria-hidden="true"></i></button>
+          <button class="icon-btn" onclick="goToToday()" style="font-size:11px;font-weight:700;">hoy</button>
+          <button class="mobile-add-btn" onclick="openExerciseModal()" style="display:flex;">
+            <i class="ph ph-plus" aria-hidden="true"></i> Agregar ejercicio
+          </button>
+        </div>
+      </div>
+
+      <!-- Exercise summary card -->
+      <div class="exercise-ring-card">
+        <div class="card-title">Actividad de hoy</div>
+        <div class="exercise-ring-inner">
+          <div class="ring-wrap">
+            <svg width="100" height="100" viewBox="0 0 110 110">
+              <circle cx="55" cy="55" r="40" fill="none" stroke="var(--border)" stroke-width="10"/>
+              <circle id="exercise-ring-progress" cx="55" cy="55" r="40" fill="none"
+                stroke="var(--primary)" stroke-width="10"
+                stroke-linecap="round"
+                stroke-dasharray="251.2"
+                stroke-dashoffset="251.2"
+                style="transition: stroke-dashoffset 0.7s cubic-bezier(0.34,1.2,0.64,1)"/>
+            </svg>
+            <div class="ring-center">
+              <span class="ring-kcal exercise-kcal-burned" id="exercise-total-burned">0</span>
+              <span class="ring-sub">kcal</span>
+            </div>
+          </div>
+          <div class="exercise-ring-stats">
+            <div class="ring-stat-row">
+              <span class="ring-stat-label">Sesiones hoy</span>
+              <span class="ring-stat-val" id="exercise-sessions-today">0</span>
+            </div>
+            <div class="ring-stat-row">
+              <span class="ring-stat-label">Kcal ingeridas</span>
+              <span class="ring-stat-val" id="exercise-kcal-in">—</span>
+            </div>
+            <div class="ring-stat-row">
+              <span class="ring-stat-label">Meta ajustada</span>
+              <span class="ring-stat-val" id="exercise-adjusted-goal">—</span>
+            </div>
+          </div>
+        </div>
+        <div class="exercise-net-balance">
+          <span class="exercise-net-label">Balance neto vs meta + ejercicio</span>
+          <span class="exercise-net-value" id="exercise-net-balance-val">—</span>
+        </div>
+      </div>
+
+      <!-- Week chart -->
+      <div class="exercise-week-card">
+        <div class="card-title">Calorías quemadas esta semana</div>
+        <div class="exercise-week-bars" id="exercise-week-bars"></div>
+      </div>
+
+      <!-- Stats grid -->
+      <div class="exercise-stats-grid" id="exercise-stats-grid"></div>
+
+      <!-- Exercise list -->
+      <div class="card" style="margin-top:0;">
+        <div class="food-list-header">
+          <div class="card-title" style="margin:0;">Ejercicios de hoy</div>
+        </div>
+        <div class="exercise-list" id="exercise-list"></div>
+      </div>
+
+    </div><!-- /page-exercise -->
 
     <!-- ===== STATS PAGE ===== -->
     <div id="page-stats" class="page">
@@ -376,6 +471,80 @@
       </div>
 
       <div class="settings-section">
+        <h3>Exportar / Importar datos</h3>
+        <p class="export-desc">Exportá tus datos para usarlos en otro dispositivo o como respaldo.</p>
+
+        <!-- Export -->
+        <div class="export-block">
+          <div class="export-block-title">Exportar</div>
+
+          <div class="export-option-row">
+            <label class="export-radio-label">
+              <input type="radio" name="export-scope" value="all" checked onchange="updateExportPreview()" />
+              Todo el registro
+            </label>
+            <label class="export-radio-label">
+              <input type="radio" name="export-scope" value="range" onchange="updateExportPreview()" />
+              Rango de fechas
+            </label>
+            <label class="export-radio-label">
+              <input type="radio" name="export-scope" value="today" onchange="updateExportPreview()" />
+              Solo hoy
+            </label>
+          </div>
+
+          <div id="export-range-inputs" style="display:none;" class="export-range-row">
+            <div class="form-row" style="margin:0;flex:1;">
+              <label>Desde</label>
+              <input type="date" id="export-date-from" onchange="updateExportPreview()" />
+            </div>
+            <div class="form-row" style="margin:0;flex:1;">
+              <label>Hasta</label>
+              <input type="date" id="export-date-to" onchange="updateExportPreview()" />
+            </div>
+          </div>
+
+          <div class="export-option-row" style="margin-top:10px;">
+            <label class="export-radio-label">
+              <input type="checkbox" id="export-include-foods" checked onchange="updateExportPreview()" />
+              Comidas
+            </label>
+            <label class="export-radio-label">
+              <input type="checkbox" id="export-include-exercises" checked onchange="updateExportPreview()" />
+              Ejercicios
+            </label>
+            <label class="export-radio-label">
+              <input type="checkbox" id="export-include-saved" checked onchange="updateExportPreview()" />
+              Comidas guardadas
+            </label>
+          </div>
+
+          <div class="export-preview" id="export-preview">—</div>
+
+          <button class="export-btn" onclick="exportData()">
+            <i class="ph-fill ph-download-simple" aria-hidden="true"></i> Descargar archivo
+          </button>
+        </div>
+
+        <!-- Import -->
+        <div class="export-block" style="margin-top:16px;">
+          <div class="export-block-title">Importar</div>
+          <p class="export-desc" style="margin-bottom:10px;">
+            Seleccioná un archivo <code>.json</code> exportado previamente. Los datos se fusionan sin pisar lo existente.
+          </p>
+          <label class="import-file-label">
+            <i class="ph-fill ph-upload-simple" aria-hidden="true"></i>
+            <span id="import-file-label-text">Seleccionar archivo .json</span>
+            <input type="file" id="import-file-input" accept=".json" onchange="handleImportFile(event)" style="display:none;" />
+          </label>
+          <div id="import-preview" class="export-preview" style="display:none;"></div>
+          <button class="export-btn" id="import-confirm-btn" style="display:none;" onclick="confirmImport()">
+            <i class="ph-fill ph-check" aria-hidden="true"></i> Confirmar importación
+          </button>
+        </div>
+      </div>
+
+      <div class="settings-section">
         <h3>Cuenta</h3>
         <button class="danger-btn" onclick="switchProfile()" style="margin-bottom:10px;">
           Cambiar / agregar perfil
@@ -395,6 +564,10 @@
       <i class="ph-fill ph-house nav-icon" aria-hidden="true"></i>
       Inicio
     </button>
+    <button class="nav-item" data-page="exercise" onclick="showPage('exercise')">
+      <i class="ph-fill ph-lightning nav-icon" aria-hidden="true"></i>
+      Ejercicio
+    </button>
     <button class="nav-item" data-page="stats" onclick="showPage('stats')">
       <i class="ph-fill ph-chart-line-up nav-icon" aria-hidden="true"></i>
       Stats
@@ -405,8 +578,108 @@
     </button>
 </nav>
 
-<!-- FAB (mobile) -->
+<!-- FAB (mobile) comida -->
 <button class="fab" id="fab" style="display:none;" onclick="openModal()"><i class="ph ph-plus" aria-hidden="true"></i></button>
+
+<!-- FAB (mobile) ejercicio -->
+<button class="fab" id="exercise-fab" style="display:none; background:var(--primary);" onclick="openExerciseModal()"><i class="ph ph-lightning" aria-hidden="true"></i></button>
+
+<!-- ====== EXERCISE MODAL ====== -->
+<div class="modal-overlay" id="exercise-modal-overlay" onclick="if(event.target===this)closeExerciseModal()">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Registrar ejercicio</h3>
+      <button class="close-btn" onclick="closeExerciseModal()"><i class="ph ph-x" aria-hidden="true"></i></button>
+    </div>
+
+    <div class="exercise-type-selector">
+      <label>Tipo de ejercicio</label>
+      <div class="exercise-type-pills">
+        <button class="exercise-pill active" data-type="cardio" onclick="selectExerciseType('cardio')">Cardio</button>
+        <button class="exercise-pill" data-type="strength" onclick="selectExerciseType('strength')">Fuerza</button>
+        <button class="exercise-pill" data-type="hiit" onclick="selectExerciseType('hiit')">HIIT</button>
+        <button class="exercise-pill" data-type="flexibility" onclick="selectExerciseType('flexibility')">Flexibilidad</button>
+        <button class="exercise-pill" data-type="sport" onclick="selectExerciseType('sport')">Deporte</button>
+        <button class="exercise-pill" data-type="other" onclick="selectExerciseType('other')">Otro</button>
+      </div>
+    </div>
+
+    <div class="tab-bar">
+      <button class="exercise-tab-btn tab-btn active" data-tab="ai" onclick="switchExerciseTab('ai')">
+        <i class="ph-fill ph-robot tab-icon" aria-hidden="true"></i>Analizar con IA
+      </button>
+      <button class="exercise-tab-btn tab-btn" data-tab="manual" onclick="switchExerciseTab('manual')">
+        <i class="ph-fill ph-note-pencil tab-icon" aria-hidden="true"></i>Manual
+      </button>
+    </div>
+
+    <!-- AI TAB -->
+    <div class="tab-content active" id="exercise-tab-ai">
+      <div class="exercise-ai-panel">
+        <div class="exercise-ai-title">Calculá el gasto calórico con IA</div>
+        <p class="exercise-ai-sub">Describí qué hiciste y la IA estimará las calorías quemadas según tu peso, edad y sexo.</p>
+      </div>
+
+      <div class="form-row">
+        <label>Describí tu ejercicio</label>
+        <textarea id="exercise-text-input"
+          placeholder="Ej: corrí 5km en 30 minutos, entrené pesas 1 hora pierna y espalda, jugué al fútbol 90 minutos..."
+          oninput="toggleExerciseAnalyzeBtn()"></textarea>
+      </div>
+
+      <button class="analyze-btn" id="analyze-exercise-btn" onclick="analyzeExercise()" disabled style="width:100%;margin-bottom:14px;">
+        Calcular gasto →
+      </button>
+
+      <div class="loading-state" id="exercise-loading-state" style="display:none;">
+        <div class="loading-dots"><span></span><span></span><span></span></div>
+        <p>Calculando gasto calórico con IA…</p>
+      </div>
+
+      <div class="exercise-ai-result" id="exercise-ai-result">
+        <div class="form-row">
+          <label>Nombre del ejercicio</label>
+          <input type="text" id="exercise-edit-name" placeholder="Ej: Carrera 5km" />
+        </div>
+        <div class="form-row-2">
+          <div class="form-row">
+            <label>Calorías quemadas</label>
+            <input type="number" id="exercise-edit-kcal" placeholder="0" />
+          </div>
+          <div class="form-row">
+            <label>Duración (min)</label>
+            <input type="number" id="exercise-edit-duration" placeholder="30" />
+          </div>
+        </div>
+        <div class="ai-note" id="exercise-res-note"></div>
+      </div>
+
+      <button class="btn-primary btn-green" id="add-exercise-btn" style="display:none;margin-top:0;" onclick="addExerciseFromAi()">
+        Guardar ejercicio
+      </button>
+    </div>
+
+    <!-- MANUAL TAB -->
+    <div class="tab-content" id="exercise-tab-manual">
+      <div class="form-row">
+        <label>Nombre del ejercicio</label>
+        <input type="text" id="exercise-manual-name" placeholder="Ej: Caminata, Ciclismo, Pesas..." />
+      </div>
+      <div class="form-row-2">
+        <div class="form-row">
+          <label>Calorías quemadas</label>
+          <input type="number" id="exercise-manual-kcal" placeholder="300" />
+        </div>
+        <div class="form-row">
+          <label>Duración (min)</label>
+          <input type="number" id="exercise-manual-duration" placeholder="45" />
+        </div>
+      </div>
+      <button class="btn-primary btn-green" style="margin-top:0;" onclick="addManualExercise()">Agregar →</button>
+    </div>
+
+  </div>
+</div>
 
 <!-- ====== ADD FOOD MODAL ====== -->
 <div class="modal-overlay" id="modal-overlay" onclick="handleOverlayClick(event)">
