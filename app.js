@@ -3,6 +3,7 @@ let currentProfile = null;
 let currentDate = todayStr();
 let selectedPhotos = [];
 let aiParsedFood = null;
+let aiCorrectionHistory = [];
 let editingFoodId = null;
 let selectedMealType = 'breakfast';
 
@@ -67,7 +68,13 @@ function clamp(value, min, max) {
 
 function parseAiJson(text) {
   const clean = String(text || '').replace(/```json|```/g, '').trim();
-  return JSON.parse(clean);
+  try {
+    return JSON.parse(clean);
+  } catch (e) {
+    const match = clean.match(/\{[\s\S]*\}/);
+    if (match) return JSON.parse(match[0]);
+    throw new Error('No se pudo analizar la respuesta JSON de la IA');
+  }
 }
 
 function validUnit(u) {
@@ -1390,6 +1397,7 @@ function resetModal() {
   document.getElementById('ingredients-list').style.display = 'none';
   selectedPhotos = [];
   aiParsedFood = null;
+  aiCorrectionHistory = [];
 }
 
 function switchTab(tab) {
@@ -1515,6 +1523,7 @@ async function analyzeAiFood() {
         ? 'Analizando fotos y descripción con IA…'
         : 'Analizando descripción con IA…',
     });
+    aiCorrectionHistory = [];
     document.getElementById('correction-section').style.display = 'block';
   } catch (err) {
     if (err.message === 'Failed to fetch') {
@@ -1529,34 +1538,52 @@ async function analyzeAiFood() {
 
 function buildCorrectionPrompt(correction, currentFood) {
   const hasPhotos = selectedPhotos.length > 0;
-  const photoText = hasPhotos
-    ? 'Re-analizá las fotos teniendo en cuenta la corrección y devolvé SOLO un JSON válido'
-    : 'Teniendo en cuenta la corrección, devolvé SOLO un JSON válido';
+  const jsonFormat = `{
+  "name": "Nombre comida",
+  "kcal": 0,
+  "protein": 0,
+  "carbs": 0,
+  "fat": 0,
+  "note": "breve nota",
+  "meals": [
+    {
+      "name": "Nombre de la comida",
+      "kcal": 0,
+      "protein": 0,
+      "carbs": 0,
+      "fat": 0,
+      "weight": 0,
+      "weightUnit": "g",
+      "ingredients": [
+        { "name": "ingrediente", "weight": 0, "weightUnit": "g", "kcal": 0, "protein": 0, "carbs": 0, "fat": 0 }
+      ]
+    }
+  ]
+}`;
 
-  return `Actuá como un nutricionista profesional. Ya analicé una comida${hasPhotos ? ' con foto(s)' : ''} y obtuve esta estimación:
+  let historyText = '';
+  if (aiCorrectionHistory.length > 0) {
+    historyText = '\n\nCORRECCIONES ANTERIORES (aplicadas secuencialmente):\n';
+    aiCorrectionHistory.forEach((h, i) => {
+      historyText += `${i + 1}. "${h.text}" → Resultó en: kcal=${h.result.kcal}, proteinas=${h.result.protein}g, carbs=${h.result.carbs}g, grasas=${h.result.fat}g\n`;
+    });
+    historyText += '\n';
+  }
+
+  return `Actuá como un nutricionista profesional. Ya analicé una comida${hasPhotos ? ' con foto(s)' : ''} y obtuve esta estimación actual:
 
 Nombre: "${currentFood.name}"
 Calorías: ${currentFood.kcal} kcal
 Proteína: ${currentFood.protein}g
 Carbohidratos: ${currentFood.carbs}g
 Grasas: ${currentFood.fat}g
+${historyText}
+El usuario ACABA de indicar la siguiente corrección ADICIONAL: "${correction}"
 
-El usuario indica la siguiente corrección: "${correction}"
+IMPORTANTE: Esta corrección es ACUMULATIVA. Aplica este cambio SOBRE el resultado actual (que ya incorpora correcciones anteriores si las hay). No reviertas cambios previos.
 
-${photoText}, sin markdown ni texto extra, con el mismo formato:
-{
-  "name": "nombre del plato",
-  "kcal": número,
-  "protein": gramos,
-  "carbs": gramos,
-  "fat": gramos,
-  "weight": número o null,
-  "weightUnit": "g",
-  "note": "breve nota",
-  "ingredients": [
-    { "name": "componente", "weight": número, "weightUnit": "g", "kcal": número, "protein": gramos, "carbs": gramos, "fat": gramos }
-  ]
-}`;
+Re-analizá las fotos teniendo en cuenta TODO el historial y la nueva corrección. Devolvé SOLO un JSON válido, sin markdown ni texto extra, con el siguiente formato (el mismo del análisis original):
+${jsonFormat}`;
 }
 
 async function correctAiResult() {
@@ -1566,12 +1593,13 @@ async function correctAiResult() {
   const apiKey = currentProfile.apiKey;
   if (!apiKey) { showToast('Configurá tu API Key de Gemini en Ajustes'); return; }
 
+  const prevFood = aiParsedFood;
   const currentFood = {
-    name: document.getElementById('edit-name').value.trim() || (aiParsedFood ? aiParsedFood.name : ''),
-    kcal: parseInt(document.getElementById('edit-kcal').value) || (aiParsedFood ? aiParsedFood.kcal : 0),
-    protein: parseFloat(document.getElementById('edit-protein').value) || (aiParsedFood ? aiParsedFood.protein : 0),
-    carbs: parseFloat(document.getElementById('edit-carbs').value) || (aiParsedFood ? aiParsedFood.carbs : 0),
-    fat: parseFloat(document.getElementById('edit-fat').value) || (aiParsedFood ? aiParsedFood.fat : 0),
+    name: document.getElementById('edit-name').value.trim() || (prevFood ? prevFood.name : ''),
+    kcal: parseInt(document.getElementById('edit-kcal').value) || (prevFood ? prevFood.kcal : 0),
+    protein: parseFloat(document.getElementById('edit-protein').value) || (prevFood ? prevFood.protein : 0),
+    carbs: parseFloat(document.getElementById('edit-carbs').value) || (prevFood ? prevFood.carbs : 0),
+    fat: parseFloat(document.getElementById('edit-fat').value) || (prevFood ? prevFood.fat : 0),
   };
 
   const prompt = buildCorrectionPrompt(correction, currentFood);
@@ -1586,6 +1614,10 @@ async function correctAiResult() {
       prompt,
       loadingMessage: 'Aplicando corrección…',
     });
+    // Track correction history for context in future corrections
+    if (aiParsedFood) {
+      aiCorrectionHistory.push({ text: correction, result: { name: aiParsedFood.name, kcal: aiParsedFood.kcal, protein: aiParsedFood.protein, carbs: aiParsedFood.carbs, fat: aiParsedFood.fat } });
+    }
     document.getElementById('correction-input').value = '';
   } catch (err) {
     if (err.message === 'Failed to fetch') {
@@ -1594,7 +1626,7 @@ async function correctAiResult() {
       showToast('Error: ' + err.message.slice(0, 60));
     }
   } finally {
-    if (btn) btn.disabled = false;
+    finishAiAnalysis('correction-btn');
   }
 }
 
@@ -1614,7 +1646,14 @@ async function runAiAnalysis({ apiKey, buttonId, prompt, images, imageBase64, fa
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{ parts }]
+        systemInstruction: {
+          parts: [{ text: 'Sos un nutricionista profesional con acceso a tablas nutricionales detalladas. Respondé ÚNICAMENTE con JSON válido, sin markdown ni texto extra.' }]
+        },
+        contents: [{ parts }],
+        generationConfig: {
+          temperature: 0.05,
+          topP: 0.95,
+        }
       })
     }
   );
