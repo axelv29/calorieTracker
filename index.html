@@ -10,6 +10,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/fill/style.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/regular/style.css">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js" defer></script>
 <link rel="stylesheet" href="css/base.css">
 <link rel="stylesheet" href="css/layout.css">
 <link rel="stylesheet" href="css/components.css">
@@ -126,16 +127,16 @@
     <div class="sidebar-label">Menú</div>
 
     <button class="nav-link active" data-page="home" onclick="showPage('home')">
-      <i class="ph-fill ph-house nav-icon" aria-hidden="true"></i> Inicio
+      <i data-lucide="home" class="nav-icon" aria-hidden="true"></i> Inicio
     </button>
     <button class="nav-link" data-page="stats" onclick="showPage('stats')">
-      <i class="ph-fill ph-chart-line-up nav-icon" aria-hidden="true"></i> Estadísticas
+      <i data-lucide="chart-column" class="nav-icon" aria-hidden="true"></i> Estadísticas
     </button>
     <button class="nav-link" data-page="exercise" onclick="showPage('exercise')">
-      <i class="ph-fill ph-lightning nav-icon" aria-hidden="true"></i> Ejercicio
+      <i data-lucide="zap" class="nav-icon" aria-hidden="true"></i> Ejercicio
     </button>
     <button class="nav-link" data-page="settings" onclick="showPage('settings')">
-      <i class="ph-fill ph-gear-six nav-icon" aria-hidden="true"></i> Ajustes
+      <i data-lucide="settings" class="nav-icon" aria-hidden="true"></i> Ajustes
     </button>
 
     <div class="sidebar-add-btn">
@@ -560,19 +561,19 @@
 <!-- BOTTOM NAV (mobile) -->
 <nav class="bottom-nav" id="bottom-nav" style="display:none;">
     <button class="nav-item active" data-page="home" onclick="showPage('home')">
-      <i class="ph-fill ph-house nav-icon" aria-hidden="true"></i>
+      <i data-lucide="home" class="nav-icon" aria-hidden="true"></i>
       Inicio
     </button>
     <button class="nav-item" data-page="exercise" onclick="showPage('exercise')">
-      <i class="ph-fill ph-lightning nav-icon" aria-hidden="true"></i>
+      <i data-lucide="zap" class="nav-icon" aria-hidden="true"></i>
       Ejercicio
     </button>
     <button class="nav-item" data-page="stats" onclick="showPage('stats')">
-      <i class="ph-fill ph-chart-line-up nav-icon" aria-hidden="true"></i>
+      <i data-lucide="chart-column" class="nav-icon" aria-hidden="true"></i>
       Stats
     </button>
     <button class="nav-item" data-page="settings" onclick="showPage('settings')">
-      <i class="ph-fill ph-gear-six nav-icon" aria-hidden="true"></i>
+      <i data-lucide="settings" class="nav-icon" aria-hidden="true"></i>
       Ajustes
     </button>
 </nav>
@@ -810,6 +811,7 @@
           <div class="mlabel">Grasas</div>
         </div>
       </div>
+      <div class="product-badge" id="product-badge" style="display:none;"></div>
       <div class="ai-note" id="res-note"></div>
       <div class="ingredients-list" id="ingredients-list"></div>
     </div>

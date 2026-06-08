@@ -33,13 +33,24 @@ function saveProfile() {
     ? existingId
     : 'profile_' + Date.now();
 
+  const macroProtein = parseInt(document.getElementById('setup-macro-protein').value);
+  const macroCarbs = parseInt(document.getElementById('setup-macro-carbs').value);
+  const macroFat = parseInt(document.getElementById('setup-macro-fat').value);
+  const customMacros = (!Number.isNaN(macroProtein) || !Number.isNaN(macroCarbs) || !Number.isNaN(macroFat))
+    ? { protein: Number.isNaN(macroProtein) ? null : macroProtein,
+        carbs: Number.isNaN(macroCarbs) ? null : macroCarbs,
+        fat: Number.isNaN(macroFat) ? null : macroFat,
+        buffer: getMacroBuffer('setup') }
+    : undefined;
+
   profiles[id] = {
     id, name, age, sex, weight, height, activity,
     tdee,
     goalOffset,
     goal,
     apiKey: apiKey || (profiles[id] ? profiles[id].apiKey : ''),
-    savedFoods: profiles[id] ? profiles[id].savedFoods : []
+    savedFoods: profiles[id] ? profiles[id].savedFoods : [],
+    customMacros: profiles[id]?.customMacros || customMacros
   };
 
   saveProfiles(profiles);
@@ -104,6 +115,18 @@ function prefillSetupForm(p) {
   document.getElementById('setup-activity').value = p.activity;
   document.getElementById('setup-goal-offset').value = getGoalOffset(p);
   document.getElementById('setup-apikey').value = p.apiKey || '';
+
+  const cm = p.customMacros || {};
+  const proteinEl = document.getElementById('setup-macro-protein');
+  const carbsEl = document.getElementById('setup-macro-carbs');
+  const fatEl = document.getElementById('setup-macro-fat');
+  if (proteinEl) proteinEl.value = cm.protein != null ? cm.protein : '';
+  if (carbsEl) carbsEl.value = cm.carbs != null ? cm.carbs : '';
+  if (fatEl) fatEl.value = cm.fat != null ? cm.fat : '';
+  const buffer = cm.buffer === 'fat' ? 'fat' : 'carbs';
+  document.querySelectorAll('#setup-macro-buffer .macro-buffer-pill').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.buffer === buffer);
+  });
 }
 
 function clearSetupForm() {
@@ -115,6 +138,14 @@ function clearSetupForm() {
   document.getElementById('setup-goal-offset').value = 0;
   const profiles = getProfiles();
   renderProfileSwitcher(profiles, null);
+  // Limpiar macros personalizadas
+  ['setup-macro-protein','setup-macro-carbs','setup-macro-fat'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  document.querySelectorAll('#setup-macro-buffer .macro-buffer-pill').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.buffer === 'carbs');
+  });
 }
 
 // Renderiza la info del perfil en la sidebar

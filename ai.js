@@ -193,196 +193,7 @@ async function searchOpenFoodFacts(query) {
 
 function buildAiPrompt(description, weight, exactProduct) {
   const json = `{
-  "reasoning": "PASO 1: [qué veo / qué describió el usuario] → PASO 2: [peso estimado de cada ingrediente con justificación] → PASO 3: [valores nutricionales por 100g que usé para cada ingrediente y por qué] → PASO 4: [cálculo explícito: peso × val/100 = resultado para cada uno]",
-  "name": "Nombre del plato o comida",
-  "kcal": 0,
-  "protein": 0,
-  "carbs": 0,
-  "fat": 0,
-  "note": "breve aclaración sobre la estimación",
-  "meals": [
-    {
-      "name": "Nombre de la comida",
-      "kcal": 0,
-      "protein": 0,
-      "carbs": 0,
-      "fat": 0,
-      "weight": 0,
-      "weightUnit": "g",
-      "ingredients": [
-        { "name": "ingrediente", "count": 2, "unitWeight": 25, "weight": 50, "weightUnit": "g", "kcal": 0, "protein": 0, "carbs": 0, "fat": 0 }
-      ]
-    }
-  ]
-}`;
-
-  const hasPhotos = selectedPhotos.length > 0;
-  let intro = hasPhotos
-    ? 'Sos un nutricionista y dietista clínico con 20 años de experiencia. Recibís una o más fotos de comida — cada una puede ser un plato distinto o una etiqueta nutricional.'
-    : 'Sos un nutricionista y dietista clínico con 20 años de experiencia. El usuario describió una comida sin foto.';
-
-  let weightText = '';
-  if (weight) {
-    weightText = `\n⚖️ PESO CONOCIDO: El usuario indica que la porción total pesa ${weight} g. Este dato es PRIORITARIO — usalo para escalar todos los ingredientes proporcionalmente.`;
-  }
-
-  let descText = '';
-  if (description) {
-    descText = `\n📝 DESCRIPCIÓN DEL USUARIO: "${description}"\n→ Prestá atención máxima a cantidades explícitas ("2 huevos", "150g de pollo"), marcas mencionadas y modificadores de tamaño.`;
-  }
-
-  let productText = '';
-  if (exactProduct) {
-    const p = exactProduct;
-    productText = `\n\n✅ DATOS VERIFICADOS DE PRODUCTO (Open Food Facts):
-Producto: "${p.name}" (${p.brand})${p.quantity ? ' · ' + p.quantity : ''}
-Valores nutricionales CERTIFICADOS por 100g:
-  Calorías: ${p.per100g.kcal} kcal · Proteína: ${p.per100g.protein}g · Carbohidratos: ${p.per100g.carbs}g · Grasas: ${p.per100g.fat}g
-
-→ OBLIGATORIO: usá ESTOS valores exactos para ese ingrediente. Calculá kcal = (peso_g / 100) × ${p.per100g.kcal}. No uses estimaciones genéricas para este producto.`;
-    foundProduct = exactProduct;
-  }
-
-  return `${intro}
-${weightText}${descText}${productText}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-TABLA DE REFERENCIA NUTRICIONAL (valores por 100g o 100ml)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Usá SIEMPRE estos valores como punto de partida. Solo desviarte si el usuario dió datos exactos o si encontraste datos del producto específico.
-
-CARNES Y PROTEÍNAS:
-- Pechuga de pollo (cocida/grillada): 165 kcal · P:31g · C:0g · G:3.6g
-- Pechuga de pollo (cruda): 120 kcal · P:22g · C:0g · G:2.6g
-- Muslo/pata de pollo (con piel, cocido): 215 kcal · P:22g · C:0g · G:13g
-- Carne vacuna magra (bife/lomo, cocido): 217 kcal · P:26g · C:0g · G:12g
-- Carne vacuna grasa (asado, cocido): 290 kcal · P:22g · C:0g · G:22g
-- Carne picada (vacuna 80/20, cocida): 254 kcal · P:26g · C:0g · G:17g
-- Cerdo (lomo, cocido): 189 kcal · P:27g · C:0g · G:8g
-- Salchicha/pancho (tipo viena): 290 kcal · P:12g · C:2g · G:26g
-- Chorizo cocido: 350 kcal · P:14g · C:2g · G:32g
-- Pescado blanco (merluza, cocido): 105 kcal · P:22g · C:0g · G:1.5g
-- Salmón (cocido): 208 kcal · P:20g · C:0g · G:13g
-- Atún en lata (al natural): 116 kcal · P:26g · C:0g · G:1g
-- Huevo entero: 155 kcal · P:13g · C:1g · G:11g  [1 huevo mediano ≈ 55g]
-- Clara de huevo: 52 kcal · P:11g · C:0.7g · G:0.2g
-- Yema de huevo: 322 kcal · P:16g · C:3g · G:27g
-
-LÁCTEOS:
-- Leche entera: 61 kcal · P:3.2g · C:4.8g · G:3.3g  [vaso 250ml ≈ 150 kcal]
-- Leche descremada: 35 kcal · P:3.4g · C:5g · G:0.2g
-- Yogur entero natural: 61 kcal · P:3.5g · C:4.7g · G:3.3g
-- Yogur griego entero: 97 kcal · P:9g · C:3.6g · G:5g
-- Queso cremoso/crema: 350 kcal · P:8g · C:3g · G:34g
-- Queso fresco (untable tipo Mendicrim): 210 kcal · P:7g · C:4g · G:18g
-- Queso mozzarella: 280 kcal · P:22g · C:2g · G:22g
-- Queso rallado (parmesano): 431 kcal · P:38g · C:4g · G:29g
-- Queso en fetas (tipo pategrás): 330 kcal · P:25g · C:1g · G:25g
-- Manteca/mantequilla: 717 kcal · P:0.9g · C:0.1g · G:81g
-
-CEREALES, PAN Y PASTAS:
-- Arroz blanco cocido: 130 kcal · P:2.7g · C:28g · G:0.3g  [plato servido ≈ 180g]
-- Arroz integral cocido: 111 kcal · P:2.6g · C:23g · G:0.9g
-- Pasta/fideos cocidos (sin salsa): 131 kcal · P:5g · C:25g · G:1.1g  [porción ≈ 180-220g]
-- Pan blanco (lactal/molde): 265 kcal · P:9g · C:49g · G:3g  [rebanada ≈ 30g]
-- Pan francés/marraqueta: 270 kcal · P:9g · C:52g · G:2g  [unidad ≈ 80g]
-- Pan integral: 247 kcal · P:13g · C:41g · G:4g
-- Galletitas de agua (tipo Crackers): 420 kcal · P:9g · C:72g · G:11g  [1 galletita ≈ 8g]
-- Galletitas dulces (tipo sandwich, rellena): 480 kcal · P:5g · C:68g · G:22g  [1 galletita ≈ 14g]
-- Galletita con chispas de chocolate (cookie grande): 488 kcal · P:5g · C:64g · G:24g  [1 cookie ≈ 35g]
-- Oblea/galleta malteada (tipo Malteada Milka): 497 kcal · P:6.5g · C:64g · G:24g  [1 unidad ≈ 25g]
-- Alfajor doble/triple (chocolate): 440 kcal · P:5g · C:63g · G:19g  [1 alfajor ≈ 60g]
-- Avena seca: 389 kcal · P:17g · C:66g · G:7g
-- Avena cocida (con agua): 71 kcal · P:2.5g · C:12g · G:1.4g
-- Granola: 471 kcal · P:10g · C:64g · G:20g
-
-FRUTAS:
-- Manzana (con cáscara): 52 kcal · P:0.3g · C:14g · G:0.2g  [mediana ≈ 200g]
-- Banana/plátano: 89 kcal · P:1.1g · C:23g · G:0.3g  [mediana ≈ 120g]
-- Naranja: 47 kcal · P:0.9g · C:12g · G:0.1g  [mediana ≈ 180g]
-- Uvas: 69 kcal · P:0.7g · C:18g · G:0.2g
-- Sandía: 30 kcal · P:0.6g · C:8g · G:0.2g
-- Frutillas/fresas: 32 kcal · P:0.7g · C:8g · G:0.3g
-- Palta/aguacate: 160 kcal · P:2g · C:9g · G:15g  [mitad ≈ 75g]
-- Durazno/melocotón: 39 kcal · P:0.9g · C:10g · G:0.3g
-
-VERDURAS:
-- Papa/patata cocida (hervida o al horno): 86 kcal · P:1.9g · C:20g · G:0.1g  [mediana ≈ 200g]
-- Papa frita (en aceite): 312 kcal · P:3.4g · C:41g · G:15g
-- Batata/camote cocida: 86 kcal · P:1.6g · C:20g · G:0.1g
-- Tomate: 18 kcal · P:0.9g · C:3.9g · G:0.2g
-- Lechuga: 15 kcal · P:1.4g · C:2.9g · G:0.2g
-- Zanahoria: 41 kcal · P:0.9g · C:10g · G:0.2g
-- Brócoli cocido: 35 kcal · P:2.4g · C:7g · G:0.4g
-- Choclo/maíz cocido: 96 kcal · P:3.4g · C:21g · G:1.5g
-- Cebolla: 40 kcal · P:1.1g · C:9g · G:0.1g
-- Espinaca cocida: 23 kcal · P:2.9g · C:3.6g · G:0.4g
-
-LEGUMBRES:
-- Lentejas cocidas: 116 kcal · P:9g · C:20g · G:0.4g
-- Garbanzos cocidos: 164 kcal · P:8.9g · C:27g · G:2.6g
-- Porotos/frijoles negros cocidos: 132 kcal · P:8.9g · C:24g · G:0.5g
-
-GRASAS Y ACEITES:
-- Aceite (oliva, girasol, maíz — todos similares): 884 kcal · P:0g · C:0g · G:100g  [1 cucharada ≈ 10g = 88 kcal]
-- Mayonesa: 680 kcal · P:1g · C:2g · G:75g  [1 cucharada ≈ 15g = 100 kcal]
-
-BEBIDAS:
-- Coca-Cola / gaseosa regular: 42 kcal · P:0g · C:10.6g · G:0g  [lata 355ml ≈ 150 kcal]
-- Gaseosa diet/zero: 0-1 kcal · P:0g · C:0g · G:0g
-- Jugo de naranja natural: 45 kcal · P:0.7g · C:10g · G:0.2g
-- Cerveza (lager regular): 43 kcal · P:0.5g · C:3.6g · G:0g  [lata 355ml ≈ 153 kcal]
-- Vino tinto/blanco seco: 85 kcal · P:0.1g · C:2.6g · G:0g  [copa 150ml ≈ 128 kcal]
-- Leche chocolatada: 83 kcal · P:3.4g · C:12g · G:2.5g
-
-DULCES, SNACKS Y COMIDA RÁPIDA:
-- Chocolate con leche (tipo Milka, Cadbury): 535 kcal · P:7.5g · C:59g · G:30g  [cuadrado ≈ 10g]
-- Chocolate amargo (>70% cacao): 598 kcal · P:8g · C:46g · G:43g
-- Helado de crema (vainilla, chocolate): 207 kcal · P:3.5g · C:24g · G:11g  [bola ≈ 60g]
-- Papas fritas en bolsa (chips): 536 kcal · P:7g · C:53g · G:35g
-- Porción de pizza (masa fina, mozzarella): 266 kcal · P:11g · C:33g · G:10g  [porción ≈ 100g]
-- Hamburguesa (carne + pan, sin extras): 295 kcal · P:17g · C:24g · G:14g  [≈ 150g]
-- Medialunas/croissant: 406 kcal · P:8g · C:45g · G:21g  [1 unidad ≈ 50g]
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-PROCESO DE ANÁLISIS — 4 pasos obligatorios, documentados en "reasoning"
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-PASO 1 — IDENTIFICAR LOS ALIMENTOS:
-${hasPhotos ? '- Describí cada comida visible: nombre, cantidad visual (¿cuántas unidades?), tamaño aparente comparado con el plato o cubiertos.\n- Si hay una etiqueta nutricional en la foto, leé DIRECTAMENTE esos valores — son los más precisos.' : '- Interpretá la descripción del usuario e identificá cada componente.'}
-- Si el usuario mencionó cantidades exactas, usá esas. Si no, estimá desde la imagen.
-
-PASO 2 — ESTIMAR PESOS:
-- Para cada ingrediente, indicá el peso estimado con su justificación: "3 galletitas malteadas × 25g c/u = 75g".
-- Si el usuario dió el peso total, usalo para re-escalar proporcionalmente los ingredientes.
-- Ajustá por tamaño visible: porciones grandes +20-40%, chicas −20-40%.
-- Modificadores de lenguaje: "mitad/poco/chico" → ×0.5, "grande/extra/doble" → ×1.5.
-
-PASO 3 — ASIGNAR VALORES NUTRICIONALES POR 100g:
-- Para CADA ingrediente, buscalo en la tabla de referencia de arriba y anotá sus valores por 100g.
-- Si el usuario mencionó una marca específica (Milka, Coca-Cola, etc.), usá los valores de esa marca si los conocés — son más precisos que los genéricos.
-- Si hay datos exactos de producto provistos (Open Food Facts), esos tienen prioridad absoluta.
-- Documentá en "reasoning" qué fila de la tabla usaste para cada ingrediente.
-
-PASO 4 — CALCULAR (aritmética exacta, sin redondeos intermedios):
-- Para cada ingrediente: kcal = (weight_g / 100) × kcal_per100g. Ídem para P, C y G.
-- Total de cada comida = SUMA EXACTA de sus ingredientes.
-- Total general = SUMA EXACTA de todas las comidas.
-- NO redondees hasta el JSON final.
-
-REGLAS:
-- Unidades: líquidos en ml/L, sólidos en g/kg. >1000g → expresar en kg.
-- weightUnit: "ml", "L", "g" o "kg" únicamente.
-- Incluí "count" y "unitWeight" cuando haya unidades contables (galletitas, huevos, etc.).
-
-Respondé SOLO con JSON válido. Cero markdown. Cero texto fuera del JSON.
-${json}`;
-}
-
-function buildCorrectionPrompt(correction, currentFood) {
-  const hasPhotos = selectedPhotos.length > 0;
-  const jsonFormat = `{
-  "reasoning": "Explicación del ajuste realizado",
+  "reasoning": "PASO 1: veo X objetos... PASO 2: peso ref de cada uno... PASO 3: multiplico por cantidad y ajusto...",
   "name": "Nombre comida",
   "kcal": 0,
   "protein": 0,
@@ -404,63 +215,158 @@ function buildCorrectionPrompt(correction, currentFood) {
     }
   ]
 }`;
+  const hasPhotos = selectedPhotos.length > 0;
+  let intro = hasPhotos
+    ? 'Actuá como un nutricionista profesional con acceso a tablas nutricionales detalladas. Recibís una o más fotos — cada una puede ser una comida distinta O una etiqueta nutricional.'
+    : 'Actuá como un nutricionista profesional con acceso a tablas nutricionales detalladas. El usuario describió una comida sin foto.';
+
+  let weightText = '';
+  if (weight) {
+    weightText = `\nEl usuario indica que la porción total pesa ${weight} gramos. Usá este dato como referencia para escalar los ingredientes.`;
+  }
+
+  let descText = '';
+  if (description) {
+    descText = `\n- Descripción del usuario: "${description}". Prestá MUCHA atención a las cantidades, porciones y modificaciones que mencione.`;
+  }
+
+  let productText = '';
+  if (exactProduct) {
+    const p = exactProduct;
+    productText = `\n\nDATOS EXACTOS DE PRODUCTO REAL ENCONTRADO EN BASE DE DATOS:
+Producto: "${p.name}" (${p.brand})${p.quantity ? ' · ' + p.quantity : ''}
+Valores nutricionales REALES por 100g:
+- Calorías: ${p.per100g.kcal} kcal
+- Proteína: ${p.per100g.protein}g
+- Carbohidratos: ${p.per100g.carbs}g
+- Grasas: ${p.per100g.fat}g
+
+IMPORTANTE: USÁ ESTOS VALORES EXACTOS para los ingredientes que correspondan a este producto. No uses estimaciones genéricas ni valores de tablas. Si la foto muestra este producto y el usuario indicó cantidades, calculá los macros multiplicando estos valores por el peso real de la porción.`;
+
+    foundProduct = exactProduct;
+  }
+
+  return `${intro}
+${weightText}
+
+PROCESO DE ANÁLISIS — seguí estos 4 pasos EN ORDEN y registrá tu razonamiento en el campo "reasoning" del JSON:
+
+PASO 1 — DESCRIBÍ LO QUE VES EN LA FOTO:
+- Describí cada comida visible: ¿cuántos objetos hay? ¿qué forma, tamaño y volumen aparente tienen?
+- Compará con objetos de referencia si los hay (manos, platos, cubiertos, monedas).
+- Especificá cantidades exactas: ej. "3 malteadas", "2 galletitas", "un plato de arroz".
+
+PASO 2 — CONSULTÁ PESOS DE REFERENCIA:
+Usá estos valores como base. NO te desvíes mucho de estos rangos a menos que la foto muestre claramente porciones extremas. Prestá atención: "malteada" PUEDE ser una galleta (oblea malteada) o una bebida — usá el contexto visual para decidir:
+- Galleta malteada / oblea malteada (tipo Malteada de Milka o similar) → 20-30 g cada una
+- Batido / malteada (bebida espumosa en vaso) → 300-400 ml
+- Galletita de chocolate (chica, tipo Chips Ahoy!) → 15-20 g cada una
+- Galletita con chispas (grande, estilo cookie) → 30-40 g cada una
+- Manzana → 180-220 g (mediana)
+- Huevo → 50-60 g cada uno
+- Rebanada de pan → 30-40 g
+- Arroz / pasta (porción cocida) → 150-200 g
+- Papa → 200-300 g (mediana)
+- Carne vacuna / cerdo (filete) → 150-250 g
+- Pollo (pechuga) → 150-200 g
+- Pescado (filete) → 120-180 g
+- Queso (porción) → 30-50 g
+- Leche (vaso) → 200-250 ml
+- Gaseosa / jugo (lata) → 355 ml
+- Cerveza (lata o botella chica) → 355 ml
+- Pancho / salchicha → 50-80 g
+- Porción de pizza (grande) → 100-150 g
+- Helado (bola) → 50-70 g
+- Yogur (pote) → 150-200 g
+- Ensalada (plato normal) → 200-300 g
+- Sopas / guisos (plato hondo) → 300-400 ml
+- Tostada / pan tostado → 25-35 g
+- Frutos secos (puñado) → 25-35 g
+- Palta / aguacate (mediano) → 150-200 g
+- Banana → 100-130 g
+
+PASO 3 — ESTIMÁ LA CANTIDAD REAL:
+- CONTÁ los objetos individuales visibles en la foto. Ej: "3 galletas malteadas", "2 galletitas de chocolate".
+- Buscá el peso unitario de referencia para ese alimento en la tabla del PASO 2.
+- Calculá: peso total = count × peso_unitario. Ajustá según tamaño visible (grande +30%, chico -30%).
+- Ej: 3 galletas malteadas × 25 g c/u = 75 g total. 2 galletitas × 18 g c/u = 36 g total.
+- IMPORTANTE: incluí "count" y "unitWeight" en el JSON para cada ingrediente.
+- Si el usuario indicó peso total, usalo para escalar todo.
+
+PASO 4 — CALCULÁ MACROS Y TOTALES:
+- kcal = peso × (valor nutricional por 100g / 100).
+- El total de cada comida = suma EXACTA de sus ingredientes.
+- El total general = suma EXACTA de todas las comidas.
+
+REGLAS DE UNIDADES:
+- Líquidos en ml o L, sólidos en g o kg.
+- Si supera 1000 g → expresalo en kg (ej: 1.5 kg).
+- weightUnit debe ser "ml", "L", "g" o "kg".
+
+ATENCIÓN A CALIFICATIVOS:
+- "mitad", "poco", "chico" → ~50% de porción normal.
+- "grande", "extra", "bien servido" → ~130-150%.
+- "mediano", "normal", "estándar" → porción típica.
+${descText}
+- Si menciona cantidades exactas ("3 galletitas", "2 tostadas"), usá ese número exacto × peso unitario.
+
+SI EL USUARIO MENCIONÓ UNA MARCA O PRODUCTO ESPECÍFICO:
+- Si más arriba se te dieron DATOS EXACTOS DE PRODUCTO REAL, usá ESOS valores obligatoriamente.
+- Si NO se te dieron datos exactos pero el usuario mencionó una marca (Milka, Coca-Cola, Arcor, etc.), buscá EN TU CONOCIMIENTO los valores nutricionales de ESE producto específico. No uses genéricos ("galletita") si sabés los valores del producto de marca.
+- Ej: si dice "Coca-Cola 355ml", usá los valores reales de Coca-Cola (42 kcal/355ml, 10.6g azúcar), no genérico "gaseosa".
+- Ej: si dice "Milka galleta malteada", usá los valores de ese producto específico si los conocés.
+${productText}
+Respondé SOLO con JSON válido. El campo "reasoning" debe documentar tu análisis de los PASOS 1, 2 y 3. Los campos numéricos deben reflejar SOLO el resultado del PASO 4.
+${json}`;
+}
+
+function buildCorrectionPrompt(correction, currentFood) {
+  const hasPhotos = selectedPhotos.length > 0;
+  const jsonFormat = `{
+  "name": "Nombre comida",
+  "kcal": 0,
+  "protein": 0,
+  "carbs": 0,
+  "fat": 0,
+  "note": "breve nota",
+  "meals": [
+    {
+      "name": "Nombre de la comida",
+      "kcal": 0,
+      "protein": 0,
+      "carbs": 0,
+      "fat": 0,
+      "weight": 0,
+      "weightUnit": "g",
+      "ingredients": [
+        { "name": "ingrediente", "weight": 0, "weightUnit": "g", "kcal": 0, "protein": 0, "carbs": 0, "fat": 0 }
+      ]
+    }
+  ]
+}`;
 
   let historyText = '';
   if (aiCorrectionHistory.length > 0) {
-    historyText = '\n\nCORRECCIONES ANTERIORES (aplicadas secuencialmente — mantené estos cambios):\n';
+    historyText = '\n\nCORRECCIONES ANTERIORES (aplicadas secuencialmente):\n';
     aiCorrectionHistory.forEach((h, i) => {
-      historyText += `\nCorrección ${i + 1}: "${h.text}"`;
-      if (h.result.meals && h.result.meals.length > 0) {
-        h.result.meals.forEach(m => {
-          historyText += `\n  → ${m.name || 'comida'}: ${m.kcal} kcal | P${m.protein}g | C${m.carbs}g | G${m.fat}g`;
-          if (m.ingredients && m.ingredients.length > 0) {
-            m.ingredients.forEach(ing => {
-              const weightStr = ing.count && ing.unitWeight
-                ? `${ing.count} × ${ing.unitWeight}${ing.weightUnit} = ${ing.weight}${ing.weightUnit}`
-                : `${ing.weight}${ing.weightUnit}`;
-              historyText += `\n    · ${ing.name}: ${weightStr} → ${ing.kcal} kcal | P${ing.protein}g | C${ing.carbs}g | G${ing.fat}g`;
-            });
-          }
-        });
-      }
+      historyText += `${i + 1}. "${h.text}" → Resultó en: kcal=${h.result.kcal}, proteinas=${h.result.protein}g, carbs=${h.result.carbs}g, grasas=${h.result.fat}g\n`;
     });
     historyText += '\n';
   }
 
-  let ingredientsText = '';
-  if (currentFood.meals && currentFood.meals.length > 0) {
-    ingredientsText = '\n\nINGREDIENTES ACTUALES (antes de esta corrección):\n';
-    currentFood.meals.forEach(m => {
-      ingredientsText += `\n${m.name || 'Comida'}: total ${m.kcal} kcal | P${m.protein}g | C${m.carbs}g | G${m.fat}g`;
-      if (m.ingredients && m.ingredients.length > 0) {
-        m.ingredients.forEach(ing => {
-          const weightStr = ing.count && ing.unitWeight
-            ? `${ing.count} × ${ing.unitWeight}${ing.weightUnit} = ${ing.weight}${ing.weightUnit}`
-            : `${ing.weight}${ing.weightUnit}`;
-          ingredientsText += `\n  · ${ing.name}: ${weightStr} → ${ing.kcal} kcal | P${ing.protein}g | C${ing.carbs}g | G${ing.fat}g`;
-        });
-      }
-    });
-  }
+  return `Actuá como un nutricionista profesional. Ya analicé una comida${hasPhotos ? ' con foto(s)' : ''} y obtuve esta estimación actual:
 
-  return `Sos un nutricionista y dietista clínico. Ya analizaste una comida${hasPhotos ? ' con foto(s)' : ''}.
-
-ESTIMACIÓN ACTUAL (antes de la nueva corrección):
 Nombre: "${currentFood.name}"
-Calorías: ${currentFood.kcal} kcal · Proteína: ${currentFood.protein}g · Carbohidratos: ${currentFood.carbs}g · Grasas: ${currentFood.fat}g
-${currentFood.weight ? `Peso total: ${currentFood.weight}${currentFood.weightUnit || 'g'}` : ''}
-${ingredientsText}
+Calorías: ${currentFood.kcal} kcal
+Proteína: ${currentFood.protein}g
+Carbohidratos: ${currentFood.carbs}g
+Grasas: ${currentFood.fat}g
 ${historyText}
-NUEVA corrección del usuario: "${correction}"
+El usuario ACABA de indicar la siguiente corrección ADICIONAL: "${correction}"
 
-INSTRUCCIONES:
-1. Aplicá esta corrección SOBRE el estado actual (incluyendo correcciones previas si las hay). No reviertas nada.
-2. Si la corrección modifica un ingrediente existente (ej: "el arroz son 200g, no 100g"), cambialo y recalculá sus macros: kcal = (nuevo_peso / 100) × kcal_per100g.
-3. Si agrega un ingrediente nuevo, estimá su peso unitario y calculá con valores nutricionales correctos.
-4. Documentá en "reasoning" qué cambiaste exactamente y la aritmética del recálculo.
-${hasPhotos ? '5. Re-examiná las fotos para verificar cantidades con la nueva información.' : ''}
+IMPORTANTE: Esta corrección es ACUMULATIVA. Aplica este cambio SOBRE el resultado actual (que ya incorpora correcciones anteriores si las hay). No reviertas cambios previos.
 
-Respondé SOLO con JSON válido, sin markdown. Incluí "count" y "unitWeight" cuando haya unidades contables.
+Re-analizá las fotos teniendo en cuenta TODO el historial y la nueva corrección. Devolvé SOLO un JSON válido, sin markdown ni texto extra, con el siguiente formato (el mismo del análisis original):
 ${jsonFormat}`;
 }
 
@@ -470,8 +376,8 @@ function handlePhotoSelect(e) {
   const files = Array.from(e.target.files);
   if (!files.length) return;
 
-  const MAX = 1600;
-  const QUALITY = 0.90;
+  const MAX = 1024;
+  const QUALITY = 0.82;
   let loaded = 0;
 
   files.forEach((file) => {
@@ -600,8 +506,6 @@ async function analyzeAiFood() {
     } else {
       showToast('Error: ' + err.message.slice(0, 60));
     }
-  } finally {
-    finishAiAnalysis('analyze-btn');
   }
 }
 
@@ -619,10 +523,6 @@ async function correctAiResult() {
     protein: parseFloat(document.getElementById('edit-protein').value) || (prevFood ? prevFood.protein : 0),
     carbs: parseFloat(document.getElementById('edit-carbs').value) || (prevFood ? prevFood.carbs : 0),
     fat: parseFloat(document.getElementById('edit-fat').value) || (prevFood ? prevFood.fat : 0),
-    meals: prevFood ? prevFood.meals : [],
-    ingredients: prevFood ? (prevFood.ingredients || prevFood.meals?.flatMap?.(m => m.ingredients) || []) : [],
-    weight: prevFood ? prevFood.weight : null,
-    weightUnit: prevFood ? prevFood.weightUnit : 'g',
   };
 
   const prompt = buildCorrectionPrompt(correction, currentFood);
@@ -638,17 +538,7 @@ async function correctAiResult() {
       loadingMessage: 'Aplicando corrección…',
     });
     if (aiParsedFood) {
-      aiCorrectionHistory.push({
-        text: correction,
-        result: {
-          name: aiParsedFood.name,
-          kcal: aiParsedFood.kcal,
-          protein: aiParsedFood.protein,
-          carbs: aiParsedFood.carbs,
-          fat: aiParsedFood.fat,
-          meals: JSON.parse(JSON.stringify(aiParsedFood.meals || [])),
-        }
-      });
+      aiCorrectionHistory.push({ text: correction, result: { name: aiParsedFood.name, kcal: aiParsedFood.kcal, protein: aiParsedFood.protein, carbs: aiParsedFood.carbs, fat: aiParsedFood.fat } });
     }
     document.getElementById('correction-input').value = '';
   } catch (err) {
@@ -657,8 +547,6 @@ async function correctAiResult() {
     } else {
       showToast('Error: ' + err.message.slice(0, 60));
     }
-  } finally {
-    finishAiAnalysis('correction-btn');
   }
 }
 
@@ -672,37 +560,48 @@ async function runAiAnalysis({ apiKey, buttonId, prompt, images, imageBase64, fa
   });
   parts.push({ text: prompt });
 
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        systemInstruction: {
-          parts: [{ text: 'Sos un nutricionista y dietista clínico experto. Tu única tarea es analizar alimentos y devolver estimaciones nutricionales precisas en formato JSON. Usás tablas nutricionales estándar (USDA, bases de datos latinoamericanas) y conocés los valores de marcas comunes del mercado hispanohablante. Respondé ÚNICAMENTE con JSON válido y bien formado. Cero markdown. Cero texto fuera del JSON. Verificá que todos los totales sean la suma exacta de sus partes.' }]
-        },
-        contents: [{ parts }],
-        generationConfig: {
-          temperature: 0.1,
-          topP: 0.92,
-          thinkingConfig: { thinkingBudget: 0 }
-        }
-      })
-    }
-  );
-
-  const data = await res.json();
+  let res, data;
+  try {
+    res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          systemInstruction: {
+            parts: [{ text: 'Sos un nutricionista profesional con acceso a tablas nutricionales detalladas. Respondé ÚNICAMENTE con JSON válido, sin markdown ni texto extra.' }]
+          },
+          contents: [{ parts }],
+          generationConfig: {
+            temperature: 0.05,
+            topP: 0.95,
+          }
+        })
+      }
+    );
+    data = await res.json();
+  } catch (fetchErr) {
+    finishAiAnalysis(buttonId);
+    throw fetchErr;
+  }
 
   if (!res.ok) {
     const msg = data?.error?.message || 'Error desconocido';
     console.error('Gemini error:', res.status, data);
+    finishAiAnalysis(buttonId);
     showErrorModal('Error ' + res.status, msg);
-    return;
+    throw new Error(msg);
   }
 
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  if (!text) {
+    finishAiAnalysis(buttonId);
+    throw new Error('Respuesta vacía de la API');
+  }
+
   const parsed = parseAiJson(text);
   showAiFoodResult(parsed, fallbackWeight);
+  finishAiAnalysis(buttonId);
 }
 
 // ===== ADD FROM AI =====

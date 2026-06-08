@@ -5,6 +5,9 @@
 // ============================================================
 
 window.addEventListener('load', () => {
+  if (typeof lucide !== 'undefined') {
+    lucide.createIcons({ attrs: { width: 18, height: 18, 'stroke-width': 1.5 } });
+  }
   initTheme();
   const id = getActiveProfileId();
   const profiles = getProfiles();

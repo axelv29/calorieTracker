@@ -8,7 +8,11 @@ let editingFoodId = null;
 let selectedMealType = 'breakfast';
 
 function todayStr() {
-  return new Date().toISOString().split('T')[0];
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 function getStorage(key) {
@@ -109,6 +113,8 @@ function normalizeAiFood(food, fallbackWeight) {
         const iUnit = validUnit(i?.weightUnit);
         return {
           name: String(i?.name || '').trim(),
+          count: Number(i?.count) > 0 ? Number(i.count) : null,
+          unitWeight: Number(i?.unitWeight) > 0 ? roundWeight(i.unitWeight, iUnit) : null,
           weight: roundWeight(i?.weight, iUnit),
           weightUnit: iUnit,
           kcal: Math.round(Number(i?.kcal) || 0),
@@ -160,6 +166,8 @@ function normalizeAiFood(food, fallbackWeight) {
     const iUnit = validUnit(i?.weightUnit);
     return {
       name:    String(i?.name || '').trim(),
+      count: Number(i?.count) > 0 ? Number(i.count) : null,
+      unitWeight: Number(i?.unitWeight) > 0 ? roundWeight(i.unitWeight, iUnit) : null,
       weight:  roundWeight(i?.weight, iUnit),
       weightUnit: iUnit,
       kcal:    Math.round(Number(i?.kcal)   || 0),
@@ -233,6 +241,7 @@ function showAiFoodResult(food, fallbackWeight) {
 
 function buildAiPrompt(description, weight) {
   const json = `{
+  "reasoning": "PASO 1: veo X objetos... PASO 2: peso ref de cada uno... PASO 3: multiplico por cantidad y ajusto...",
   "name": "Nombre comida",
   "kcal": 0,
   "protein": 0,
@@ -249,7 +258,7 @@ function buildAiPrompt(description, weight) {
       "weight": 0,
       "weightUnit": "g",
       "ingredients": [
-        { "name": "ingrediente", "weight": 0, "weightUnit": "g", "kcal": 0, "protein": 0, "carbs": 0, "fat": 0 }
+        { "name": "ingrediente", "count": 2, "unitWeight": 25, "weight": 50, "weightUnit": "g", "kcal": 0, "protein": 0, "carbs": 0, "fat": 0 }
       ]
     }
   ]
@@ -259,39 +268,81 @@ function buildAiPrompt(description, weight) {
     ? 'Actuá como un nutricionista profesional con acceso a tablas nutricionales detalladas. Recibís una o más fotos — cada una puede ser una comida distinta O una etiqueta nutricional.'
     : 'Actuá como un nutricionista profesional con acceso a tablas nutricionales detalladas. El usuario describió una comida sin foto.';
 
-  let parts = [];
-  if (hasPhotos) parts.push('- Para cada foto de comida, identificá todos los ingredientes visibles y estimá su peso de forma REALISTA según lo que se ve en la imagen. Basate en proporciones visuales y recetas estándar.');
-  if (description) parts.push(`- Descripción del usuario: "${description}". Prestá MUCHA atención a las cantidades, porciones y modificaciones que mencione.`);
-  parts.push('- Si una foto es una etiqueta nutricional, usá esos valores exactos para el ingrediente correspondiente.');
-  parts.push('- Calculá kcal y macros de cada ingrediente desde su peso × valores nutricionales por 100g.');
-  parts.push('- El total de cada comida debe ser la suma EXACTA de sus ingredientes. Verificá antes de responder.');
-  parts.push('- El objeto raíz (kcal/protein/carbs/fat) debe ser la suma EXACTA de todas las comidas.');
-
   let weightText = '';
   if (weight) {
     weightText = `\nEl usuario indica que la porción total pesa ${weight} gramos. Usá este dato como referencia para escalar los ingredientes.`;
   }
 
+  let descText = '';
+  if (description) {
+    descText = `\n- Descripción del usuario: "${description}". Prestá MUCHA atención a las cantidades, porciones y modificaciones que mencione.`;
+  }
+
   return `${intro}
 ${weightText}
 
-REGLAS IMPORTANTES:
-${parts.map(p => '\n' + p).join('')}
+PROCESO DE ANÁLISIS — seguí estos 4 pasos EN ORDEN y registrá tu razonamiento en el campo "reasoning" del JSON:
+
+PASO 1 — DESCRIBÍ LO QUE VES EN LA FOTO:
+- Describí cada comida visible: ¿cuántos objetos hay? ¿qué forma, tamaño y volumen aparente tienen?
+- Compará con objetos de referencia si los hay (manos, platos, cubiertos, monedas).
+- Especificá cantidades exactas: ej. "3 malteadas", "2 galletitas", "un plato de arroz".
+
+PASO 2 — CONSULTÁ PESOS DE REFERENCIA:
+Usá estos valores como base. NO te desvíes mucho de estos rangos a menos que la foto muestre claramente porciones extremas. Prestá atención: "malteada" PUEDE ser una galleta (oblea malteada) o una bebida — usá el contexto visual para decidir:
+- Galleta malteada / oblea malteada (tipo Malteada de Milka o similar) → 20-30 g cada una
+- Batido / malteada (bebida espumosa en vaso) → 300-400 ml
+- Galletita de chocolate (chica, tipo Chips Ahoy!) → 15-20 g cada una
+- Galletita con chispas (grande, estilo cookie) → 30-40 g cada una
+- Manzana → 180-220 g (mediana)
+- Huevo → 50-60 g cada uno
+- Rebanada de pan → 30-40 g
+- Arroz / pasta (porción cocida) → 150-200 g
+- Papa → 200-300 g (mediana)
+- Carne vacuna / cerdo (filete) → 150-250 g
+- Pollo (pechuga) → 150-200 g
+- Pescado (filete) → 120-180 g
+- Queso (porción) → 30-50 g
+- Leche (vaso) → 200-250 ml
+- Gaseosa / jugo (lata) → 355 ml
+- Cerveza (lata o botella chica) → 355 ml
+- Pancho / salchicha → 50-80 g
+- Porción de pizza (grande) → 100-150 g
+- Helado (bola) → 50-70 g
+- Yogur (pote) → 150-200 g
+- Ensalada (plato normal) → 200-300 g
+- Sopas / guisos (plato hondo) → 300-400 ml
+- Tostada / pan tostado → 25-35 g
+- Frutos secos (puñado) → 25-35 g
+- Palta / aguacate (mediano) → 150-200 g
+- Banana → 100-130 g
+
+PASO 3 — ESTIMÁ LA CANTIDAD REAL:
+- CONTÁ los objetos individuales visibles en la foto. Ej: "3 galletas malteadas", "2 galletitas de chocolate".
+- Buscá el peso unitario de referencia para ese alimento en la tabla del PASO 2.
+- Calculá: peso total = count × peso_unitario. Ajustá según tamaño visible (grande +30%, chico -30%).
+- Ej: 3 galletas malteadas × 25 g c/u = 75 g total. 2 galletitas × 18 g c/u = 36 g total.
+- IMPORTANTE: incluí "count" y "unitWeight" en el JSON para cada ingrediente.
+- Si el usuario indicó peso total, usalo para escalar todo.
+
+PASO 4 — CALCULÁ MACROS Y TOTALES:
+- kcal = peso × (valor nutricional por 100g / 100).
+- El total de cada comida = suma EXACTA de sus ingredientes.
+- El total general = suma EXACTA de todas las comidas.
 
 REGLAS DE UNIDADES:
-- Para cada ingrediente, usá la unidad adecuada: líquidos en ml o L, sólidos en g o kg.
-- Ej: leche → 200 ml, agua → 250 ml, arroz → 150 g, pollo → 200 g, papa → 300 g, gaseosa → 350 ml.
-- Si un peso supera los 1000 g, expresalo en kg (ej: 1.5 kg en vez de 1500 g).
-- El campo "weightUnit" debe ser "ml", "L", "g" o "kg".
+- Líquidos en ml o L, sólidos en g o kg.
+- Si supera 1000 g → expresalo en kg (ej: 1.5 kg).
+- weightUnit debe ser "ml", "L", "g" o "kg".
 
-ATENCIÓN A PORCIONES:
-- Si el usuario dice "la mitad", "medio plato", "poco", "chico", reducí los pesos a ~50% de una porción normal.
-- Si dice "grande", "bien servido", "extra", aumentá los pesos a ~130-150% de una porción normal.
-- Si dice "mediano", "normal", "estándar" usá la porción típica.
-- Prestá MUCHA atención a calificativos de tamaño y cantidad. Una "manzana grande" no pesa lo mismo que una "manzana chica".
-- Si menciona "2 tostadas", "3 galletitas", "medio plato" etc., usá exactamente esa cantidad.
+ATENCIÓN A CALIFICATIVOS:
+- "mitad", "poco", "chico" → ~50% de porción normal.
+- "grande", "extra", "bien servido" → ~130-150%.
+- "mediano", "normal", "estándar" → porción típica.
+${descText}
+- Si menciona cantidades exactas ("3 galletitas", "2 tostadas"), usá ese número exacto × peso unitario.
 
-Respondé SOLO con JSON válido siguiendo exactamente este esquema (reemplazá los 0 y textos de ejemplo con los valores reales):
+Respondé SOLO con JSON válido. El campo "reasoning" debe documentar tu análisis de los PASOS 1, 2 y 3. Los campos numéricos deben reflejar SOLO el resultado del PASO 4.
 ${json}`;
 }
 function getMinCalories(profile) {
@@ -1731,7 +1782,7 @@ function renderMeals(meals) {
       <div class="ingredient-item">
         <div class="ingredient-name-col">
           <span class="ingredient-name">${escHtml(ing.name)}</span>
-          ${ing.weight ? `<span class="ingredient-weight">${formatWeight(ing.weight, ing.weightUnit)}</span>` : ''}
+          ${ing.weight ? `<span class="ingredient-weight">${ing.count ? ing.count + ' × ' + formatWeight(ing.unitWeight, ing.weightUnit) + ' = ' : ''}${formatWeight(ing.weight, ing.weightUnit)}</span>` : ''}
         </div>
         <div class="ingredient-macros">
           <span class="ing-kcal">${ing.kcal} kcal</span>
